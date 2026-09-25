@@ -1,0 +1,31 @@
+alias: Arrival fan-out
+description: Parallel branches followed by a bounded wait.
+triggers:
+  - trigger: event
+    event_type: mobile_app_notification_action
+actions:
+  - parallel:
+      - sequence:
+          - action: light.turn_on
+            target:
+              entity_id: light.entry
+          - delay: "00:00:02"
+          - action: light.turn_off
+            target:
+              entity_id: light.entry
+      - sequence:
+          - action: notify.mobile_app_phone
+            data:
+              message: "Arrival detected"
+      - sequence:
+          - action: media_player.volume_set
+            target:
+              entity_id: media_player.kitchen
+            data:
+              volume_level: 0.25
+  - wait_template: "{{ is_state('binary_sensor.front_door', 'off') }}"
+    timeout: "00:02:00"
+    continue_on_timeout: false
+  - action: notify.mobile_app_phone
+    data:
+      message: "Entry sequence completed"

@@ -1,0 +1,43 @@
+alias: Climate comfort schedule
+triggers:
+  - trigger: time_pattern
+    minutes: "/10"
+conditions:
+  - condition: time
+    after: "06:00:00"
+    before: "23:00:00"
+actions:
+  - choose:
+      - alias: Warm room
+        conditions:
+          - condition: numeric_state
+            entity_id: sensor.living_room_temperature
+            above: 24
+        sequence:
+          - action: climate.set_temperature
+            target:
+              entity_id: climate.living_room
+            data:
+              temperature: 21
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.away_mode
+            state: "on"
+        sequence:
+          - action: climate.turn_off
+            target:
+              entity_id: climate.living_room
+    default:
+      - action: climate.set_hvac_mode
+        target:
+          entity_id: climate.living_room
+        data:
+          hvac_mode: auto
+  - repeat:
+      count: 2
+      sequence:
+        - delay: "00:00:01"
+        - action: logbook.log
+          data:
+            name: "HA Lens fixture"
+            message: "Symbolic repeat pass"

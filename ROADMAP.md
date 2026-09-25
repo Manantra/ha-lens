@@ -19,7 +19,9 @@
 - [x] Mermaid export
 - [ ] richer condition labels
 - [x] clickable entity highlighting
-- [ ] responsive mobile/tablet layout
+- [x] richer template entity extraction
+- [x] expanded real-world fixture suite
+- [x] responsive mobile/tablet layout
 
 ## v0.2 — Documentation
 

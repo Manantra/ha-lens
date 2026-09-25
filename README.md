@@ -4,7 +4,7 @@
 
 HA Lens is a read-only visualizer and analyzer for Home Assistant automations. Paste YAML and get a semantic flow graph, execution paths, entity/action inventory, and structural insights. Nothing is executed and the YAML stays in the browser.
 
-> Status: early MVP / v0.1.0 development. The standalone app is intentionally read-only and client-side.
+> Status: early MVP / v0.1.0 development. The standalone app is intentionally read-only and client-side, with responsive desktop/tablet/mobile layouts.
 
 ## Why HA Lens?
 
@@ -12,7 +12,7 @@ Visual flow editors are great for *building* automations. HA Lens is deliberatel
 
 - Visualize triggers, conditions, `if`, `choose`, waits, repeats, parallel blocks, and actions with human-readable summaries.
 - Explore possible execution paths without touching Home Assistant.
-- See referenced entities and actions in one place, then click an entity to highlight every relevant graph node.
+- See referenced entities and actions in one place, including common Jinja helper and dotted-state references, then click an entity to highlight every relevant graph node.
 - Surface factual structural insights without pretending legal YAML is an error.
 - Use Presentation Mode for tutorials, screenshots, videos, and documentation.
 - Export the current automation map directly as SVG or high-resolution PNG.

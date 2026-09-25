@@ -1,10 +1,12 @@
 import type { AnalysisResult, AutomationModel, ConditionNode, Insight, SequenceItem, UnknownRecord } from "@ha-lens/model";
 
-const entityPattern = /\b(?:states|is_state|state_attr)\(\s*["']([a-z0-9_]+\.[a-z0-9_]+)["']/gi;
+const entityHelperPattern = /\b(?:states|is_state|is_state_attr|state_attr|has_value|expand)\(\s*["']([a-z0-9_]+\.[a-z0-9_]+)["']/gi;
+const dottedStatePattern = /\bstates\.([a-z0-9_]+)\.([a-z0-9_]+)\b/gi;
 
 function collectTemplateEntities(value: unknown, output: Set<string>) {
   if (typeof value === "string") {
-    for (const match of value.matchAll(entityPattern)) output.add(match[1]);
+    for (const match of value.matchAll(entityHelperPattern)) output.add(match[1]);
+    for (const match of value.matchAll(dottedStatePattern)) output.add(`${match[1]}.${match[2]}`);
     return;
   }
   if (Array.isArray(value)) {

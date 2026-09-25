@@ -1,9 +1,21 @@
 import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { analyzeAutomation } from "@ha-lens/analyzer";
 import { buildAutomationGraph } from "@ha-lens/graph";
 import { automationGraphToMermaid } from "@ha-lens/exporter";
 import { parseAutomationYaml } from "@ha-lens/parser";
 import { enumerateExecutionPaths } from "@ha-lens/paths";
+
+function fixtureFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const path = join(directory, entry.name);
+    return entry.isDirectory() ? fixtureFiles(path) : /\.ya?ml$/i.test(entry.name) ? [path] : [];
+  });
+}
+
+const fixtureDirectory = fileURLToPath(new URL("../fixtures", import.meta.url));
 
 const yaml = `
 alias: Test
@@ -42,6 +54,47 @@ describe("HA Lens core", () => {
     const analysis = analyzeAutomation(automation);
     expect(analysis.entities).toContain("light.hall");
     expect(analysis.actions).toContain("light.turn_on");
+  });
+
+  it("extracts common Home Assistant template entity references", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Templates
+triggers:
+  - trigger: template
+    value_template: "{{ is_state('person.alex', 'home') }}"
+conditions:
+  - condition: template
+    value_template: >
+      {{ states.sensor.lux.state | float < 20
+         and has_value('sensor.outdoor_temperature')
+         and is_state_attr('climate.office', 'hvac_action', 'heating') }}
+actions:
+  - action: light.turn_on
+    target:
+      entity_id: light.hall
+    data:
+      brightness_pct: "{{ states('input_number.hall_brightness') | int }}"
+`);
+    const analysis = analyzeAutomation(automation);
+    expect(analysis.entities).toEqual(expect.arrayContaining([
+      "person.alex",
+      "sensor.lux",
+      "sensor.outdoor_temperature",
+      "climate.office",
+      "input_number.hall_brightness",
+      "light.hall",
+    ]));
+  });
+
+  it("parses every checked-in fixture without losing the graph", () => {
+    const fixtures = fixtureFiles(fixtureDirectory);
+    expect(fixtures.length).toBeGreaterThanOrEqual(5);
+
+    for (const file of fixtures) {
+      const { automation } = parseAutomationYaml(readFileSync(file, "utf8"));
+      const graph = buildAutomationGraph(automation);
+      expect(graph.nodes.length, file).toBeGreaterThan(0);
+    }
   });
 
   it("enumerates stopped and completed paths", () => {

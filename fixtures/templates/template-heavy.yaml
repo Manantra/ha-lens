@@ -1,0 +1,20 @@
+alias: Template-heavy hallway
+description: Exercises common Jinja entity reference forms.
+triggers:
+  - trigger: template
+    value_template: >
+      {{ is_state('person.alex', 'home')
+         and states.sensor.hall_lux.state | float < 25 }}
+conditions:
+  - condition: template
+    value_template: >
+      {{ has_value('sensor.outdoor_temperature')
+         and is_state_attr('climate.hall', 'hvac_action', 'idle') }}
+actions:
+  - variables:
+      brightness: "{{ states('input_number.hall_brightness') | int(40) }}"
+  - action: light.turn_on
+    target:
+      entity_id: light.hall
+    data:
+      brightness_pct: "{{ brightness }}"
