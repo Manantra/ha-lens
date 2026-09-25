@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { analyzeAutomation } from "@ha-lens/analyzer";
+import { analyzeAutomation, explainAutomation } from "@ha-lens/analyzer";
 import { buildAutomationGraph } from "@ha-lens/graph";
 import { parseAutomationYaml } from "@ha-lens/parser";
 import { enumerateExecutionPaths } from "@ha-lens/paths";
@@ -8,12 +8,13 @@ import { exportAutomationGraph, type GraphExportFormat } from "./exportGraph";
 import { AutomationGraph } from "./AutomationGraph";
 import { sampleAutomation } from "./sample";
 
-type Tab = "summary" | "paths" | "entities" | "insights";
+type Tab = "summary" | "paths" | "entities" | "insights" | "explain";
 
 export function App() {
   const [yaml, setYaml] = useState(sampleAutomation);
   const [tab, setTab] = useState<Tab>("summary");
   const [selectedPath, setSelectedPath] = useState<ExecutionPath | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [presentation, setPresentation] = useState(false);
   const [exporting, setExporting] = useState<GraphExportFormat | null>(null);
 
@@ -23,13 +24,17 @@ export function App() {
       const analysis = analyzeAutomation(parsed.automation);
       const paths = enumerateExecutionPaths(parsed.automation);
       const graph = buildAutomationGraph(parsed.automation);
-      return { ok: true as const, ...parsed, analysis, paths, graph };
+      const explanation = explainAutomation(parsed.automation);
+      return { ok: true as const, ...parsed, analysis, paths, graph, explanation };
     } catch (error) {
       return { ok: false as const, error: error instanceof Error ? error.message : "Unable to parse YAML" };
     }
   }, [yaml]);
 
-  const highlightedNodeIds = useMemo(() => new Set(selectedPath?.steps.map((step) => step.nodeId) ?? []), [selectedPath]);
+  const highlightedNodeIds = useMemo(() => {
+    if (selectedEntity && result.ok) return new Set(result.analysis.entityUsages[selectedEntity] ?? []);
+    return new Set(selectedPath?.steps.map((step) => step.nodeId) ?? []);
+  }, [result, selectedEntity, selectedPath]);
 
   async function handleExport(format: GraphExportFormat) {
     if (!result.ok) return;
@@ -77,7 +82,7 @@ export function App() {
       <section className="workspace">
         <aside className="yaml-panel panel">
           <div className="panel__header"><strong>Automation YAML</strong><span>local only</span></div>
-          <textarea value={yaml} onChange={(event) => { setYaml(event.target.value); setSelectedPath(null); }} spellCheck={false} />
+          <textarea value={yaml} onChange={(event) => { setYaml(event.target.value); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
         </aside>
 
         <section className="graph-panel panel">
@@ -92,7 +97,7 @@ export function App() {
 
         <aside className="inspector panel">
           <nav className="tabs">
-            {(["summary", "paths", "entities", "insights"] as Tab[]).map((item) => (
+            {(["summary", "paths", "entities", "insights", "explain"] as Tab[]).map((item) => (
               <button key={item} className={tab === item ? "is-active" : ""} onClick={() => setTab(item)}>{item}</button>
             ))}
           </nav>
@@ -111,7 +116,7 @@ export function App() {
               <div className="path-list">
                 <div className="section-intro">Select a path to highlight it in the map.</div>
                 {result.paths.map((path) => (
-                  <button key={path.id} className={`path-card ${selectedPath?.id === path.id ? "is-active" : ""}`} onClick={() => setSelectedPath(selectedPath?.id === path.id ? null : path)}>
+                  <button key={path.id} className={`path-card ${selectedPath?.id === path.id ? "is-active" : ""}`} onClick={() => { setSelectedEntity(null); setSelectedPath(selectedPath?.id === path.id ? null : path); }}>
                     <span className={`outcome outcome--${path.outcome}`}>{path.outcome}</span>
                     <strong>{path.title}</strong>
                     <span>{path.steps.length} steps</span>
@@ -122,14 +127,33 @@ export function App() {
             ) : tab === "entities" ? (
               <>
                 <h3>Entities</h3>
-                <div className="token-list">{result.analysis.entities.length ? result.analysis.entities.map((entity) => <code key={entity}>{entity}</code>) : <span className="muted">No static entity IDs found.</span>}</div>
+                <div className="token-list">
+                  {result.analysis.entities.length ? result.analysis.entities.map((entity) => (
+                    <button
+                      key={entity}
+                      className={`entity-token ${selectedEntity === entity ? "is-active" : ""}`}
+                      onClick={() => { setSelectedPath(null); setSelectedEntity(selectedEntity === entity ? null : entity); }}
+                    >
+                      <code>{entity}</code>
+                      <span>{result.analysis.entityUsages[entity]?.length ?? 0} node{(result.analysis.entityUsages[entity]?.length ?? 0) === 1 ? "" : "s"}</span>
+                    </button>
+                  )) : <span className="muted">No static entity IDs found.</span>}
+                </div>
+                {selectedEntity && <div className="notice">Highlighting every graph node that references <code>{selectedEntity}</code>.</div>}
                 <h3>Actions</h3>
                 <div className="token-list">{result.analysis.actions.map((action) => <code key={action}>{action}</code>)}</div>
               </>
-            ) : (
+            ) : tab === "insights" ? (
               <>
                 <div className="section-intro">These are structural observations, not validation errors.</div>
                 {result.analysis.insights.length ? result.analysis.insights.map((insight, index) => <div className={`insight insight--${insight.level}`} key={`${insight.nodeId}-${index}`}>{insight.message}</div>) : <div className="empty-state">No structural insights for this automation.</div>}
+              </>
+            ) : (
+              <>
+                <div className="section-intro">A deterministic explanation generated from the parsed automation structure. No AI or cloud processing is used.</div>
+                <div className="explanation-list">
+                  {result.explanation.map((line, index) => <p key={index}><span>{index + 1}</span>{line}</p>)}
+                </div>
               </>
             )}
           </div>

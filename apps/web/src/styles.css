@@ -46,6 +46,13 @@ button.ghost { background: transparent; color: #dce3f5; }
 .privacy { margin-top: 24px; color: #68748a; font-size: 11px; }
 .token-list { display: flex; flex-direction: column; gap: 7px; }
 .token-list code { background: #171c27; border: 1px solid #2b3240; padding: 8px 9px; border-radius: 8px; color: #cbdcff; overflow-wrap: anywhere; }
+.entity-token { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 0; background: transparent; border-color: transparent; color: inherit; text-align: left; }
+.entity-token code { flex: 1; }
+.entity-token span { color: #77839a; font-size: 10px; white-space: nowrap; }
+.entity-token.is-active code { border-color: #6f8df5; box-shadow: 0 0 0 1px #6f8df5 inset; }
+.explanation-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.explanation-list p { display: grid; grid-template-columns: 24px 1fr; gap: 8px; margin: 0; padding: 10px 12px; border: 1px solid #2a3140; border-radius: 10px; background: #151a24; color: #dce3f5; font-size: 12px; line-height: 1.55; }
+.explanation-list p > span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; background: #263146; color: #9db4ff; font-size: 10px; font-weight: 800; }
 .path-list { display: flex; flex-direction: column; gap: 8px; }
 .path-card { text-align: left; display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; background: #151a24; color: #dfe7f8; border-color: #2c3342; }
 .path-card.is-active { border-color: #6f8df5; box-shadow: 0 0 0 1px #6f8df5 inset; }

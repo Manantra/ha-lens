@@ -12,10 +12,11 @@
 - [x] entity/action inventory
 - [x] structural insights
 - [x] presentation mode
+- [x] deterministic explain view
 - [x] unknown-node fallback
 - [x] SVG/PNG export
 - [ ] richer condition labels
-- [ ] clickable entity highlighting
+- [x] clickable entity highlighting
 - [ ] responsive mobile/tablet layout
 
 ## v0.2 — Documentation

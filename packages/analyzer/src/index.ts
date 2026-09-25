@@ -104,6 +104,90 @@ function inspectSequence(items: SequenceItem[], depth = 1): {
   return { actions, decisions, maxDepth, calls, insights };
 }
 
+function recordEntityUsage(raw: UnknownRecord, nodeId: string, usage: Map<string, Set<string>>) {
+  const entities = new Set<string>();
+  collectTemplateEntities(raw, entities);
+  for (const entity of entities) {
+    const ids = usage.get(entity) ?? new Set<string>();
+    ids.add(nodeId);
+    usage.set(entity, ids);
+  }
+}
+
+function recordConditionUsage(condition: ConditionNode, usage: Map<string, Set<string>>) {
+  recordEntityUsage(condition.raw, condition.id, usage);
+  for (const child of condition.children ?? []) recordConditionUsage(child, usage);
+}
+
+function recordSequenceUsage(items: SequenceItem[], usage: Map<string, Set<string>>) {
+  for (const item of items) {
+    recordEntityUsage(item.raw, item.id, usage);
+    if (item.kind === "if") {
+      item.conditions.forEach((condition) => recordConditionUsage(condition, usage));
+      recordSequenceUsage(item.then, usage);
+      recordSequenceUsage(item.else, usage);
+    } else if (item.kind === "choose") {
+      for (const choice of item.choices) {
+        choice.conditions.forEach((condition) => recordConditionUsage(condition, usage));
+        recordSequenceUsage(choice.sequence, usage);
+      }
+      recordSequenceUsage(item.default, usage);
+    } else if (item.kind === "repeat") {
+      recordSequenceUsage(item.sequence, usage);
+    } else if (item.kind === "parallel") {
+      item.branches.forEach((branch) => recordSequenceUsage(branch, usage));
+    } else if (item.kind === "inline-condition") {
+      recordConditionUsage(item.condition, usage);
+    }
+  }
+}
+
+function summarizeSequence(items: SequenceItem[]): string {
+  if (!items.length) return "nothing";
+  const labels = items.slice(0, 3).map((item) => item.summary);
+  const suffix = items.length > 3 ? ` and ${items.length - 3} more step${items.length - 3 === 1 ? "" : "s"}` : "";
+  return labels.join(", ") + suffix;
+}
+
+export function explainAutomation(automation: AutomationModel): string[] {
+  const lines: string[] = [];
+
+  if (automation.triggers.length) {
+    lines.push(`Starts when ${automation.triggers.map((trigger) => trigger.summary).join(" or ")}.`);
+  } else {
+    lines.push("Has no explicit trigger in the pasted YAML, so the flow begins manually or from an unspecified source.");
+  }
+
+  if (automation.conditions.length) {
+    lines.push(`Before actions run, every top-level condition must pass: ${automation.conditions.map((condition) => condition.summary).join("; ")}.`);
+  }
+
+  for (const item of automation.actions) {
+    if (item.kind === "service") {
+      lines.push(`Then it calls ${item.summary}.`);
+    } else if (item.kind === "if") {
+      const conditionText = item.conditions.map((condition) => condition.summary).join("; ") || "its condition";
+      lines.push(`Decision: ${conditionText}. If true: ${summarizeSequence(item.then)}. If false: ${summarizeSequence(item.else)}.`);
+    } else if (item.kind === "choose") {
+      lines.push(`Choose checks ${item.choices.length} option${item.choices.length === 1 ? "" : "s"} in order and runs the first match${item.default.length ? ", otherwise it uses the default branch" : ""}.`);
+    } else if (item.kind === "repeat") {
+      lines.push(`${item.summary} repeats a nested sequence; HA Lens keeps the loop symbolic because the actual iteration count can depend on runtime state.`);
+    } else if (item.kind === "parallel") {
+      lines.push(`${item.summary} starts ${item.branches.length} branches concurrently.`);
+    } else if (item.kind === "wait") {
+      lines.push(`${item.summary}${item.timeout != null ? ` with timeout ${String(item.timeout)}` : " without a timeout"}.`);
+    } else if (item.kind === "stop") {
+      lines.push(`${item.summary} ends execution at that point.`);
+    } else if (item.kind === "inline-condition") {
+      lines.push(`${item.summary} must pass or execution stops immediately.`);
+    } else {
+      lines.push(`${item.summary} is part of the action sequence.`);
+    }
+  }
+
+  return lines;
+}
+
 function countTemplates(value: unknown): number {
   if (typeof value === "string") return value.includes("{{") || value.includes("{%") ? 1 : 0;
   if (Array.isArray(value)) return value.reduce((sum, child) => sum + countTemplates(child), 0);
@@ -117,6 +201,10 @@ export function analyzeAutomation(automation: AutomationModel): AnalysisResult {
 
   const conditionStats = automation.conditions.map(countCondition);
   const sequenceInfo = inspectSequence(automation.actions);
+  const entityUsage = new Map<string, Set<string>>();
+  automation.triggers.forEach((trigger) => recordEntityUsage(trigger.raw, trigger.id, entityUsage));
+  automation.conditions.forEach((condition) => recordConditionUsage(condition, entityUsage));
+  recordSequenceUsage(automation.actions, entityUsage);
   const conditionCount = conditionStats.reduce((sum, value) => sum + value.count, 0);
   const conditionDepth = Math.max(0, ...conditionStats.map((value) => value.depth));
 
@@ -130,6 +218,11 @@ export function analyzeAutomation(automation: AutomationModel): AnalysisResult {
       templates: countTemplates(automation.raw),
     },
     entities: [...entities].sort(),
+    entityUsages: Object.fromEntries(
+      [...entityUsage.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([entity, ids]) => [entity, [...ids]]),
+    ),
     actions: [...new Set(sequenceInfo.calls)].sort(),
     insights: sequenceInfo.insights,
   };

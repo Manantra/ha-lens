@@ -129,6 +129,7 @@ export interface Insight {
 export interface AnalysisResult {
   stats: AutomationStats;
   entities: string[];
+  entityUsages: Record<string, string[]>;
   actions: string[];
   insights: Insight[];
 }

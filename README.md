@@ -12,10 +12,11 @@ Visual flow editors are great for *building* automations. HA Lens is deliberatel
 
 - Visualize triggers, conditions, `if`, `choose`, waits, repeats, parallel blocks, and actions.
 - Explore possible execution paths without touching Home Assistant.
-- See referenced entities and actions in one place.
+- See referenced entities and actions in one place, then click an entity to highlight every relevant graph node.
 - Surface factual structural insights without pretending legal YAML is an error.
 - Use Presentation Mode for tutorials, screenshots, videos, and documentation.
 - Export the current automation map directly as SVG or high-resolution PNG.
+- Read a deterministic Explain view generated entirely from the parsed structure.
 - Keep unknown/new Home Assistant syntax visible instead of crashing.
 
 ## Quick start
@@ -49,6 +50,10 @@ The parser currently recognizes top-level triggers/conditions/actions plus commo
 Path expansion is intentionally bounded and symbolic around loops/parallel execution; HA Lens does not claim to statically execute Jinja templates or emulate Home Assistant.
 
 ## Deployment
+
+### One-time GitHub Pages setup
+
+In the repository, open **Settings → Pages → Build and deployment** and set **Source** to **GitHub Actions**. This is a one-time repository setting; after that, every push to `main` deploys automatically.
 
 The repository includes a GitHub Pages workflow. For the planned `Manantra/ha-lens` repository it builds the app with `/ha-lens/` as the base path and publishes `apps/web/dist`.
 
