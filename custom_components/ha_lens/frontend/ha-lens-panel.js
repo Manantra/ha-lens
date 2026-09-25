@@ -8,6 +8,7 @@ class HaLensPanel extends HTMLElement {
     this._panel = null;
     this._selected = "";
     this._pendingMessage = null;
+    this._registryPromise = null;
     this._targetOrigin = new URL(DEFAULT_STANDALONE_URL).origin;
     this._onWindowMessage = this._onWindowMessage.bind(this);
   }
@@ -210,6 +211,85 @@ class HaLensPanel extends HTMLElement {
     }
   }
 
+  _collectEntityIds(value, output = new Set()) {
+    if (typeof value === "string") {
+      for (const match of value.matchAll(/\b(?:states|is_state|is_state_attr|state_attr|has_value|expand)\(\s*["']([a-z0-9_]+\.[a-z0-9_]+)["']/gi)) {
+        output.add(match[1]);
+      }
+      for (const match of value.matchAll(/\bstates\.([a-z0-9_]+)\.([a-z0-9_]+)\b/gi)) {
+        output.add(`${match[1]}.${match[2]}`);
+      }
+      return output;
+    }
+
+    if (Array.isArray(value)) {
+      for (const item of value) this._collectEntityIds(item, output);
+      return output;
+    }
+
+    if (value && typeof value === "object") {
+      for (const [key, child] of Object.entries(value)) {
+        if (key === "entity_id") {
+          const values = Array.isArray(child) ? child : [child];
+          for (const entityId of values) {
+            if (typeof entityId === "string" && /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(entityId)) {
+              output.add(entityId);
+            }
+          }
+        }
+        this._collectEntityIds(child, output);
+      }
+    }
+
+    return output;
+  }
+
+  async _registryData() {
+    if (!this._hass?.callWS) return { areas: [], devices: [], entities: [] };
+
+    if (!this._registryPromise) {
+      this._registryPromise = Promise.all([
+        this._hass.callWS({ type: "config/area_registry/list" }),
+        this._hass.callWS({ type: "config/device_registry/list" }),
+        this._hass.callWS({ type: "config/entity_registry/list" }),
+      ])
+        .then(([areas, devices, entities]) => ({ areas, devices, entities }))
+        .catch((error) => {
+          console.warn("HA Lens could not load registry metadata", error);
+          return { areas: [], devices: [], entities: [] };
+        });
+    }
+
+    return this._registryPromise;
+  }
+
+  async _entityMetadata(config) {
+    const entityIds = this._collectEntityIds(config);
+    const { areas, devices, entities } = await this._registryData();
+
+    const areasById = new Map(areas.map((area) => [area.area_id, area]));
+    const devicesById = new Map(devices.map((device) => [device.id, device]));
+    const entitiesById = new Map(entities.map((entity) => [entity.entity_id, entity]));
+    const metadata = {};
+
+    for (const entityId of entityIds) {
+      const state = this._hass?.states?.[entityId];
+      const registry = entitiesById.get(entityId);
+      const device = registry?.device_id ? devicesById.get(registry.device_id) : null;
+      const areaId = registry?.area_id || device?.area_id;
+      const area = areaId ? areasById.get(areaId) : null;
+
+      metadata[entityId] = {
+        name: registry?.name || state?.attributes?.friendly_name || registry?.original_name || entityId,
+        icon: registry?.icon || state?.attributes?.icon || null,
+        area: area?.name || null,
+        device: device?.name_by_user || device?.name || null,
+      };
+    }
+
+    return metadata;
+  }
+
   async _loadAutomation(entityId) {
     if (!this._hass?.connection) return;
 
@@ -223,11 +303,14 @@ class HaLensPanel extends HTMLElement {
 
       if (!result?.config) throw new Error("Home Assistant returned no automation config.");
 
+      const entityMetadata = await this._entityMetadata(result.config);
+
       this._pendingMessage = {
         type: "ha-lens:automation",
         version: 1,
         entityId,
         config: result.config,
+        entityMetadata,
       };
 
       this._sendPending();

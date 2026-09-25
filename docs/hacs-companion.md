@@ -7,7 +7,7 @@ The first companion release is intentionally read-only.
 - Adds **HA Lens** to the Home Assistant sidebar.
 - Lists loaded `automation.*` entities.
 - Reads the selected automation with Home Assistant's existing `automation/config` WebSocket command.
-- Passes only the selected automation configuration to the HA Lens viewer in the browser.
+- Passes only the selected automation configuration plus metadata for referenced entities to the HA Lens viewer in the browser.
 - Does not register any write action and does not modify automation YAML.
 
 The panel requires an administrator because Home Assistant's `automation/config` WebSocket command is admin-only.
@@ -19,7 +19,8 @@ Home Assistant
   └─ HA Lens custom panel
        ├─ hass.states -> automation selector
        ├─ hass.connection -> automation/config
-       └─ postMessage(config)
+       ├─ area/device/entity registries -> referenced entity metadata
+       └─ postMessage(config + metadata)
              ↓
        HA Lens standalone viewer
        https://manantra.github.io/ha-lens/
@@ -43,5 +44,6 @@ Until HA Lens is published in a default HACS catalog:
 
 - Read-only.
 - Admin-only panel in this preview.
-- No entity-registry friendly names, areas, or device metadata inside the graph yet.
+- Friendly names, area names, device names, and icon identifiers are shown for referenced entities when Home Assistant provides them.
+- Full MDI icon rendering inside the standalone iframe is not implemented yet.
 - No trace overlay yet.

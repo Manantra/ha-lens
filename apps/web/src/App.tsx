@@ -11,6 +11,13 @@ import { sampleAutomation } from "./sample";
 
 type Tab = "summary" | "paths" | "entities" | "insights" | "explain";
 
+interface CompanionEntityMetadata {
+  name?: string | null;
+  icon?: string | null;
+  area?: string | null;
+  device?: string | null;
+}
+
 export function App() {
   const [yaml, setYaml] = useState(sampleAutomation);
   const [tab, setTab] = useState<Tab>("summary");
@@ -19,6 +26,7 @@ export function App() {
   const [presentation, setPresentation] = useState(false);
   const [exporting, setExporting] = useState<GraphExportFormat | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [entityMetadata, setEntityMetadata] = useState<Record<string, CompanionEntityMetadata>>({});
 
   useEffect(() => {
     if (window.parent === window) return;
@@ -35,10 +43,15 @@ export function App() {
       if (parentOrigin && event.origin !== parentOrigin) return;
       if (!event.data || typeof event.data !== "object") return;
 
-      const message = event.data as { type?: string; config?: unknown };
+      const message = event.data as {
+        type?: string;
+        config?: unknown;
+        entityMetadata?: Record<string, CompanionEntityMetadata>;
+      };
       if (message.type !== "ha-lens:automation" || !message.config || typeof message.config !== "object") return;
 
       setYaml(serializeAutomationYaml(message.config));
+      setEntityMetadata(message.entityMetadata && typeof message.entityMetadata === "object" ? message.entityMetadata : {});
       setSelectedPath(null);
       setSelectedEntity(null);
       setTab("summary");
@@ -118,7 +131,7 @@ export function App() {
           <div className="tagline">See what your Home Assistant automation can do.</div>
         </div>
         <div className="topbar__actions">
-          <button className="ghost" onClick={() => setYaml(sampleAutomation)}>Load example</button>
+          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setEntityMetadata({}); }}>Load example</button>
           <button className="ghost" disabled={!result.ok} onClick={() => void copyMermaid()}>{copyStatus === "copied" ? "Mermaid copied ✓" : copyStatus === "failed" ? "Copy failed" : "Copy Mermaid"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("svg")}>{exporting === "svg" ? "Exporting…" : "Export SVG"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
@@ -129,7 +142,7 @@ export function App() {
       <section className="workspace">
         <aside className="yaml-panel panel">
           <div className="panel__header"><strong>Automation YAML</strong><span>local only</span></div>
-          <textarea value={yaml} onChange={(event) => { setYaml(event.target.value); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
+          <textarea value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
         </aside>
 
         <section className="graph-panel panel">
@@ -175,16 +188,24 @@ export function App() {
               <>
                 <h3>Entities</h3>
                 <div className="token-list">
-                  {result.analysis.entities.length ? result.analysis.entities.map((entity) => (
-                    <button
-                      key={entity}
-                      className={`entity-token ${selectedEntity === entity ? "is-active" : ""}`}
-                      onClick={() => { setSelectedPath(null); setSelectedEntity(selectedEntity === entity ? null : entity); }}
-                    >
-                      <code>{entity}</code>
-                      <span>{result.analysis.entityUsages[entity]?.length ?? 0} node{(result.analysis.entityUsages[entity]?.length ?? 0) === 1 ? "" : "s"}</span>
-                    </button>
-                  )) : <span className="muted">No static entity IDs found.</span>}
+                  {result.analysis.entities.length ? result.analysis.entities.map((entity) => {
+                    const metadata = entityMetadata[entity];
+                    const context = [metadata?.area, metadata?.device, metadata?.icon].filter(Boolean).join(" · ");
+                    return (
+                      <button
+                        key={entity}
+                        className={`entity-token ${selectedEntity === entity ? "is-active" : ""}`}
+                        onClick={() => { setSelectedPath(null); setSelectedEntity(selectedEntity === entity ? null : entity); }}
+                      >
+                        <span className="entity-token__identity">
+                          <code>{entity}</code>
+                          {metadata?.name && metadata.name !== entity && <small>{metadata.name}</small>}
+                          {context && <small className="entity-token__context">{context}</small>}
+                        </span>
+                        <span>{result.analysis.entityUsages[entity]?.length ?? 0} node{(result.analysis.entityUsages[entity]?.length ?? 0) === 1 ? "" : "s"}</span>
+                      </button>
+                    );
+                  }) : <span className="muted">No static entity IDs found.</span>}
                 </div>
                 {selectedEntity && <div className="notice">Highlighting every graph node that references <code>{selectedEntity}</code>.</div>}
                 <h3>Actions</h3>
