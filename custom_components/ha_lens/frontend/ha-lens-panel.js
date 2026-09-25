@@ -52,15 +52,19 @@ class HaLensPanel extends HTMLElement {
         :host {
           display: block;
           width: 100%;
-          height: 100%;
-          min-height: 0;
+          height: 100vh;
+          height: 100dvh;
+          min-height: 100vh;
+          min-height: 100dvh;
+          overflow: hidden;
           color: var(--primary-text-color, #eef2ff);
           background: var(--primary-background-color, #0b0d12);
           font-family: var(--paper-font-body1_-_font-family, system-ui, sans-serif);
         }
 
         .shell {
-          height: 100%;
+          height: 100vh;
+          height: 100dvh;
           min-height: 0;
           display: grid;
           grid-template-rows: auto minmax(0, 1fr);
@@ -113,6 +117,7 @@ class HaLensPanel extends HTMLElement {
         }
 
         iframe {
+          display: block;
           width: 100%;
           height: 100%;
           min-height: 0;

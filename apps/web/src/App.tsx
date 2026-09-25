@@ -27,6 +27,7 @@ export function App() {
   const [exporting, setExporting] = useState<GraphExportFormat | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const [entityMetadata, setEntityMetadata] = useState<Record<string, CompanionEntityMetadata>>({});
+  const embedded = useMemo(() => new URLSearchParams(window.location.search).get("embedded") === "1", []);
 
   useEffect(() => {
     if (window.parent === window) return;
@@ -124,8 +125,8 @@ export function App() {
   }
 
   return (
-    <main className="app-shell">
-      <header className="topbar">
+    <main className={embedded ? "app-shell app-shell--embedded" : "app-shell"}>
+      {!embedded && <header className="topbar">
         <div>
           <div className="brand"><span className="brand-mark">◉</span> HA Lens <span className="badge">v0.1</span></div>
           <div className="tagline">See what your Home Assistant automation can do.</div>
@@ -137,7 +138,7 @@ export function App() {
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
           <button disabled={!result.ok} onClick={() => setPresentation(true)}>Presentation mode</button>
         </div>
-      </header>
+      </header>}
 
       <section className="workspace">
         <aside className="yaml-panel panel">
