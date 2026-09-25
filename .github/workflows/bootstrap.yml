@@ -1,0 +1,34 @@
+name: Bootstrap HA Lens
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "bootstrap.tar.gz.b64"
+      - ".github/workflows/bootstrap.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Extract HA Lens project
+        shell: bash
+        run: |
+          base64 -d bootstrap.tar.gz.b64 > /tmp/ha-lens.tar.gz
+          tar -xzf /tmp/ha-lens.tar.gz
+          rm -f bootstrap.tar.gz.b64 .github/workflows/bootstrap.yml
+
+      - name: Commit project
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "feat: bootstrap HA Lens MVP"
+          git push
