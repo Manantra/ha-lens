@@ -1,0 +1,10 @@
+{
+  "name": "@ha-lens/parser",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "dependencies": {
+    "@ha-lens/model": "*",
+    "yaml": "^2.9.1"
+  }
+}
