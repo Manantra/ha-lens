@@ -48,7 +48,7 @@ custom_components Home Assistant / HACS companion preview
 
 ## Home Assistant companion preview
 
-The repository now includes a first read-only HACS-compatible custom integration under `custom_components/ha_lens`. It adds an admin-only HA Lens panel to the Home Assistant sidebar, lets you select an existing automation, and reads its configuration using Home Assistant's existing WebSocket API. No write action is registered.
+The repository includes a read-only HACS-compatible custom integration under `custom_components/ha_lens`. It adds an admin-only HA Lens panel to the Home Assistant sidebar, lets you select an existing automation, and reads its configuration using Home Assistant's existing WebSocket API. No write action is registered. The compiled visualizer is bundled into the integration, so the Home Assistant companion does not depend on GitHub Pages at runtime.
 
 See [`docs/hacs-companion.md`](docs/hacs-companion.md) for installation, architecture, privacy notes, and current limitations.
 
@@ -77,7 +77,7 @@ The repository includes a GitHub Pages workflow. For the planned `Manantra/ha-le
 
 ## Privacy
 
-The standalone app is designed to work entirely client-side. Your automation YAML is not sent to a HA Lens backend. The companion preview passes a selected automation between the Home Assistant panel and the embedded static viewer with browser `postMessage`; it does not expose a Home Assistant token to HA Lens.
+The standalone app is designed to work entirely client-side. Your automation YAML is not sent to a HA Lens backend. The companion passes a selected automation between the Home Assistant panel and its locally bundled same-origin viewer with browser `postMessage`; it does not expose a Home Assistant token to HA Lens and does not require GitHub Pages at runtime.
 
 See [`docs/support-matrix.md`](docs/support-matrix.md) for the v0.1 syntax matrix and deliberate limitations.
 

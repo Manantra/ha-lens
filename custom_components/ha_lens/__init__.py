@@ -13,7 +13,7 @@ from .const import (
     PANEL_ICON,
     PANEL_TITLE,
     PANEL_URL,
-    STANDALONE_URL,
+    VIEWER_URL,
     STATIC_URL,
 )
 
@@ -40,7 +40,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         sidebar_icon=PANEL_ICON,
         module_url=f"{STATIC_URL}/ha-lens-panel.js",
         require_admin=True,
-        config={"standalone_url": STANDALONE_URL},
+        config={"viewer_url": VIEWER_URL},
         config_panel_domain=DOMAIN,
     )
 

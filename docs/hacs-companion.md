@@ -22,13 +22,13 @@ Home Assistant
        ├─ area/device/entity registries -> referenced entity metadata
        └─ postMessage(config + metadata)
              ↓
-       HA Lens standalone viewer
-       https://manantra.github.io/ha-lens/
+       Bundled HA Lens viewer
+       /ha_lens_static/app/index.html
 ```
 
-The preview loads the visualizer frontend from GitHub Pages. The automation configuration is transferred between the two browser frames with `window.postMessage`; HA Lens has no backend that receives the YAML. Loading the viewer itself still requires internet access.
+The companion ships the compiled visualizer inside `custom_components/ha_lens/frontend/app` and Home Assistant serves it from `/ha_lens_static/app/`. The automation configuration is transferred between two same-origin browser frames with `window.postMessage`; HA Lens has no backend that receives the YAML.
 
-A later companion version should ship the full visualizer frontend locally with the integration so it works without GitHub Pages.
+The companion therefore works without GitHub Pages and does not need internet access after HACS has installed the integration. GitHub Pages remains available only for the standalone public demo.
 
 ## HACS custom-repository install
 

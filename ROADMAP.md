@@ -35,7 +35,7 @@
 - [x] optional HACS-compatible panel preview
 - [x] select an existing automation directly
 - [x] read automation config through Home Assistant's existing WebSocket API
-- [ ] bundle the full visualizer locally for offline use
+- [x] bundle the full visualizer locally for offline use
 - [x] friendly names, areas, device metadata and icon identifiers
 - [ ] render Home Assistant / MDI icons visually
 - [x] no write-back in the first companion release

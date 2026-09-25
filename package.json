@@ -12,7 +12,8 @@
     "build": "npm run build -w @ha-lens/web",
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.check.json --noEmit",
-    "check": "npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build",
+    "bundle:companion": "npm run build -w @ha-lens/web && node scripts/sync-companion-dist.mjs"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

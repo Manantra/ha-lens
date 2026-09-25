@@ -1,4 +1,4 @@
-const DEFAULT_STANDALONE_URL = "https://manantra.github.io/ha-lens/";
+const DEFAULT_VIEWER_URL = "/ha_lens_static/app/index.html";
 
 class HaLensPanel extends HTMLElement {
   constructor() {
@@ -9,7 +9,7 @@ class HaLensPanel extends HTMLElement {
     this._selected = "";
     this._pendingMessage = null;
     this._registryPromise = null;
-    this._targetOrigin = new URL(DEFAULT_STANDALONE_URL).origin;
+    this._targetOrigin = window.location.origin;
     this._onWindowMessage = this._onWindowMessage.bind(this);
   }
 
@@ -36,12 +36,14 @@ class HaLensPanel extends HTMLElement {
     window.removeEventListener("message", this._onWindowMessage);
   }
 
-  _standaloneUrl() {
-    return this._panel?.config?.standalone_url || DEFAULT_STANDALONE_URL;
+  _viewerUrl() {
+    return this._panel?.config?.viewer_url
+      || this._panel?.config?.standalone_url
+      || DEFAULT_VIEWER_URL;
   }
 
   _embeddedUrl() {
-    const url = new URL(this._standaloneUrl());
+    const url = new URL(this._viewerUrl(), window.location.origin);
     url.searchParams.set("embedded", "1");
     return url.toString();
   }
@@ -169,8 +171,8 @@ class HaLensPanel extends HTMLElement {
 
   _applyPanelConfig() {
     if (!this._frame) return;
-    const standaloneUrl = this._standaloneUrl();
-    this._targetOrigin = new URL(standaloneUrl).origin;
+    const viewerUrl = new URL(this._viewerUrl(), window.location.origin);
+    this._targetOrigin = viewerUrl.origin;
     const nextUrl = this._embeddedUrl();
     if (this._frame.src !== nextUrl) this._frame.src = nextUrl;
   }

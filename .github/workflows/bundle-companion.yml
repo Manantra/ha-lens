@@ -1,0 +1,48 @@
+name: Bundle HACS companion frontend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/web/**"
+      - "packages/**"
+      - "package.json"
+      - "scripts/sync-companion-dist.mjs"
+      - ".github/workflows/bundle-companion.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: companion-bundle
+  cancel-in-progress: true
+
+jobs:
+  bundle:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm install
+      - run: npm run typecheck
+      - run: npm test
+      - name: Build local Home Assistant viewer
+        run: npm run bundle:companion
+        env:
+          VITE_BASE_PATH: /ha_lens_static/app/
+      - name: Commit bundled frontend
+        run: |
+          if git diff --quiet -- custom_components/ha_lens/frontend/app; then
+            echo "Bundled frontend is already current."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add custom_components/ha_lens/frontend/app
+          git commit -m "chore: refresh bundled companion frontend [skip ci]"
+          git push
