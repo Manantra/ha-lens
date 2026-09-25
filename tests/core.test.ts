@@ -48,6 +48,8 @@ describe("HA Lens core", () => {
     const paths = enumerateExecutionPaths(automation);
     expect(paths.some((path) => path.outcome === "stopped")).toBe(true);
     expect(paths.filter((path) => path.outcome === "completed").length).toBeGreaterThanOrEqual(2);
+    expect(paths.some((path) => path.title.includes("light.turn_on"))).toBe(true);
+    expect(paths.some((path) => path.title.startsWith("Stops at "))).toBe(true);
   });
 
   it("builds a graph with branch labels", () => {

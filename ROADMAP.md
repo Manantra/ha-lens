@@ -13,7 +13,7 @@
 - [x] structural insights
 - [x] presentation mode
 - [x] unknown-node fallback
-- [ ] SVG/PNG export
+- [x] SVG/PNG export
 - [ ] richer condition labels
 - [ ] clickable entity highlighting
 - [ ] responsive mobile/tablet layout

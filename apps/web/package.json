@@ -16,7 +16,8 @@
     "@xyflow/react": "^12.11.6",
     "elkjs": "^0.12.0",
     "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "react-dom": "^19.3.0",
+    "html-to-image": "^1.11.13"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

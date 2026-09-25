@@ -28,6 +28,7 @@ button.ghost { background: transparent; color: #dce3f5; }
 .yaml-panel textarea { width: 100%; height: 100%; resize: none; border: 0; outline: 0; background: #0e1117; color: #cfe2ff; padding: 16px; font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
 .graph-panel { display: grid; grid-template-rows: 46px 1fr; }
 .graph-area { min-height: 0; position: relative; background: #0d1016; }
+.automation-graph { width: 100%; height: 100%; background: #0d1016; }
 .inspector { display: grid; grid-template-rows: 46px 1fr; }
 .tabs { display: flex; padding: 7px; gap: 4px; border-bottom: 1px solid #262c38; overflow-x: auto; }
 .tabs button { flex: 1; min-width: fit-content; padding: 7px 8px; border: 0; background: transparent; color: #7f8aa0; font-size: 11px; text-transform: capitalize; }

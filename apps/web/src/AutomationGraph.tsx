@@ -35,10 +35,12 @@ export function AutomationGraph({ graph, highlightedNodeIds }: { graph: Automati
   );
 
   return (
-    <ReactFlow nodes={displayNodes} edges={displayEdges} nodeTypes={nodeTypes} fitView minZoom={0.15} maxZoom={1.8}>
-      <Background gap={24} size={1} />
-      <MiniMap pannable zoomable />
-      <Controls />
-    </ReactFlow>
+    <div className="automation-graph" data-export-graph>
+      <ReactFlow nodes={displayNodes} edges={displayEdges} nodeTypes={nodeTypes} fitView minZoom={0.15} maxZoom={1.8}>
+        <Background gap={24} size={1} />
+        <MiniMap pannable zoomable />
+        <Controls />
+      </ReactFlow>
+    </div>
   );
 }

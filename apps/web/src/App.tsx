@@ -4,6 +4,7 @@ import { buildAutomationGraph } from "@ha-lens/graph";
 import { parseAutomationYaml } from "@ha-lens/parser";
 import { enumerateExecutionPaths } from "@ha-lens/paths";
 import type { ExecutionPath } from "@ha-lens/model";
+import { exportAutomationGraph, type GraphExportFormat } from "./exportGraph";
 import { AutomationGraph } from "./AutomationGraph";
 import { sampleAutomation } from "./sample";
 
@@ -14,6 +15,7 @@ export function App() {
   const [tab, setTab] = useState<Tab>("summary");
   const [selectedPath, setSelectedPath] = useState<ExecutionPath | null>(null);
   const [presentation, setPresentation] = useState(false);
+  const [exporting, setExporting] = useState<GraphExportFormat | null>(null);
 
   const result = useMemo(() => {
     try {
@@ -29,12 +31,28 @@ export function App() {
 
   const highlightedNodeIds = useMemo(() => new Set(selectedPath?.steps.map((step) => step.nodeId) ?? []), [selectedPath]);
 
+  async function handleExport(format: GraphExportFormat) {
+    if (!result.ok) return;
+    try {
+      setExporting(format);
+      await exportAutomationGraph(result.automation.alias, format);
+    } catch (error) {
+      console.error("HA Lens export failed", error);
+    } finally {
+      setExporting(null);
+    }
+  }
+
   if (presentation && result.ok) {
     return (
       <main className="presentation">
         <header className="presentation__header">
           <div><span className="brand-mark">◉</span> HA Lens <strong>{result.automation.alias}</strong></div>
-          <button onClick={() => setPresentation(false)}>Exit presentation</button>
+          <div className="topbar__actions">
+            <button className="ghost" disabled={!!exporting} onClick={() => void handleExport("svg")}>{exporting === "svg" ? "Exporting…" : "Export SVG"}</button>
+            <button className="ghost" disabled={!!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
+            <button onClick={() => setPresentation(false)}>Exit presentation</button>
+          </div>
         </header>
         <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} /></div>
       </main>
@@ -50,6 +68,8 @@ export function App() {
         </div>
         <div className="topbar__actions">
           <button className="ghost" onClick={() => setYaml(sampleAutomation)}>Load example</button>
+          <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("svg")}>{exporting === "svg" ? "Exporting…" : "Export SVG"}</button>
+          <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
           <button disabled={!result.ok} onClick={() => setPresentation(true)}>Presentation mode</button>
         </div>
       </header>

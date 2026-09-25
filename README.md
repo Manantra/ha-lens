@@ -15,6 +15,7 @@ Visual flow editors are great for *building* automations. HA Lens is deliberatel
 - See referenced entities and actions in one place.
 - Surface factual structural insights without pretending legal YAML is an error.
 - Use Presentation Mode for tutorials, screenshots, videos, and documentation.
+- Export the current automation map directly as SVG or high-resolution PNG.
 - Keep unknown/new Home Assistant syntax visible instead of crashing.
 
 ## Quick start

@@ -75,6 +75,30 @@ function expandSequence(items: SequenceItem[], input: PathState[], maxPaths: num
   return states;
 }
 
+function pathTitle(state: PathState, index: number): string {
+  if (state.outcome === "truncated") return "Additional paths";
+
+  const last = state.steps.at(-1);
+  if (!last) return `Path ${index + 1}`;
+
+  if (state.outcome === "stopped") {
+    const stopAt = last.label
+      .replace(/\s*→\s*false$/, "")
+      .replace(/\s*→\s*timeout$/, "");
+    return `Stops at ${stopAt}`;
+  }
+
+  const terminalAction = [...state.steps]
+    .reverse()
+    .find((step) => step.detail && /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(step.detail));
+
+  if (terminalAction) return terminalAction.label;
+
+  return `Completes: ${last.label
+    .replace(/\s*→\s*true$/, "")
+    .replace(/\s*→\s*completed$/, "")}`;
+}
+
 export function enumerateExecutionPaths(automation: AutomationModel, maxPaths = 64): ExecutionPath[] {
   const triggerStates: PathState[] = automation.triggers.length
     ? automation.triggers.map((trigger) => ({ steps: [{ nodeId: trigger.id, label: trigger.summary }], terminal: false }))
@@ -97,7 +121,7 @@ export function enumerateExecutionPaths(automation: AutomationModel, maxPaths = 
 
   return all.map((state, index) => ({
     id: `path-${index + 1}`,
-    title: state.outcome === "stopped" ? `Stopped path ${index + 1}` : state.outcome === "truncated" ? "Additional paths" : `Completion path ${index + 1}`,
+    title: pathTitle(state, index),
     outcome: state.outcome ?? "completed",
     steps: state.steps,
   }));
