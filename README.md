@@ -16,6 +16,7 @@ Visual flow editors are great for *building* automations. HA Lens is deliberatel
 - Surface factual structural insights without pretending legal YAML is an error.
 - Use Presentation Mode for tutorials, screenshots, videos, and documentation.
 - Export the current automation map directly as SVG or high-resolution PNG.
+- Copy Mermaid flowchart code for GitHub READMEs, wikis, and documentation.
 - Read a deterministic Explain view generated entirely from the parsed structure.
 - Keep unknown/new Home Assistant syntax visible instead of crashing.
 
@@ -39,6 +40,7 @@ packages/parser   YAML -> semantic automation model
 packages/analyzer stats, entities, actions, insights
 packages/paths    bounded execution-path expansion
 packages/graph    semantic model -> graph nodes/edges
+packages/exporter graph -> documentation/export formats
 fixtures          real-world-ish YAML examples
 tests             parser/analyzer/path tests
 ```

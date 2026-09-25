@@ -16,6 +16,7 @@
 - [x] richer trigger and condition labels
 - [x] unknown-node fallback
 - [x] SVG/PNG export
+- [x] Mermaid export
 - [ ] richer condition labels
 - [x] clickable entity highlighting
 - [ ] responsive mobile/tablet layout
@@ -23,7 +24,6 @@
 ## v0.2 — Documentation
 
 - shareable read-only snapshots
-- Mermaid export
 - downloadable SVG/PNG
 - human-readable deterministic explanation
 - path naming based on terminal effects

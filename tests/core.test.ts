@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { analyzeAutomation } from "@ha-lens/analyzer";
 import { buildAutomationGraph } from "@ha-lens/graph";
+import { automationGraphToMermaid } from "@ha-lens/exporter";
 import { parseAutomationYaml } from "@ha-lens/parser";
 import { enumerateExecutionPaths } from "@ha-lens/paths";
 
@@ -93,6 +94,15 @@ actions:
 `);
     const graph = buildAutomationGraph(automation);
     expect(graph.edges.some((edge) => edge.label?.includes("input_boolean.guest_mode"))).toBe(true);
+  });
+
+  it("exports graph structure as Mermaid", () => {
+    const { automation } = parseAutomationYaml(yaml);
+    const graph = buildAutomationGraph(automation);
+    const mermaid = automationGraphToMermaid(graph, automation.alias);
+    expect(mermaid).toContain("flowchart TD");
+    expect(mermaid).toContain("light.turn_on");
+    expect(mermaid).toContain("-->|\"true\"|");
   });
 
   it("builds a graph with branch labels", () => {

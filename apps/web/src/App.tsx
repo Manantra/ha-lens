@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { analyzeAutomation, explainAutomation } from "@ha-lens/analyzer";
 import { buildAutomationGraph } from "@ha-lens/graph";
+import { automationGraphToMermaid } from "@ha-lens/exporter";
 import { parseAutomationYaml } from "@ha-lens/parser";
 import { enumerateExecutionPaths } from "@ha-lens/paths";
 import type { ExecutionPath } from "@ha-lens/model";
@@ -17,6 +18,7 @@ export function App() {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [presentation, setPresentation] = useState(false);
   const [exporting, setExporting] = useState<GraphExportFormat | null>(null);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
 
   const result = useMemo(() => {
     try {
@@ -36,6 +38,19 @@ export function App() {
     return new Set(selectedPath?.steps.map((step) => step.nodeId) ?? []);
   }, [result, selectedEntity, selectedPath]);
 
+  async function copyMermaid() {
+    if (!result.ok) return;
+    try {
+      await navigator.clipboard.writeText(automationGraphToMermaid(result.graph, result.automation.alias));
+      setCopyStatus("copied");
+      window.setTimeout(() => setCopyStatus("idle"), 1800);
+    } catch (error) {
+      console.error("HA Lens Mermaid copy failed", error);
+      setCopyStatus("failed");
+      window.setTimeout(() => setCopyStatus("idle"), 2400);
+    }
+  }
+
   async function handleExport(format: GraphExportFormat) {
     if (!result.ok) return;
     try {
@@ -54,6 +69,7 @@ export function App() {
         <header className="presentation__header">
           <div><span className="brand-mark">◉</span> HA Lens <strong>{result.automation.alias}</strong></div>
           <div className="topbar__actions">
+            <button className="ghost" onClick={() => void copyMermaid()}>{copyStatus === "copied" ? "Mermaid copied ✓" : "Copy Mermaid"}</button>
             <button className="ghost" disabled={!!exporting} onClick={() => void handleExport("svg")}>{exporting === "svg" ? "Exporting…" : "Export SVG"}</button>
             <button className="ghost" disabled={!!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
             <button onClick={() => setPresentation(false)}>Exit presentation</button>
@@ -73,6 +89,7 @@ export function App() {
         </div>
         <div className="topbar__actions">
           <button className="ghost" onClick={() => setYaml(sampleAutomation)}>Load example</button>
+          <button className="ghost" disabled={!result.ok} onClick={() => void copyMermaid()}>{copyStatus === "copied" ? "Mermaid copied ✓" : copyStatus === "failed" ? "Copy failed" : "Copy Mermaid"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("svg")}>{exporting === "svg" ? "Exporting…" : "Export SVG"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
           <button disabled={!result.ok} onClick={() => setPresentation(true)}>Presentation mode</button>
