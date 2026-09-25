@@ -296,12 +296,15 @@ class HaLensPanel extends HTMLElement {
   }
 
   async _loadAutomation(entityId) {
-    if (!this._hass?.connection) return;
+    if (!this._hass?.callWS) {
+      this._setStatus("Home Assistant WebSocket API is unavailable.", true);
+      return;
+    }
 
     this._setStatus("Loading automation…", false);
 
     try {
-      const result = await this._hass.connection.sendMessagePromise({
+      const result = await this._hass.callWS({
         type: "automation/config",
         entity_id: entityId,
       });
@@ -323,7 +326,12 @@ class HaLensPanel extends HTMLElement {
       this._setStatus(selected ? selected.name : entityId, false);
     } catch (error) {
       console.error("HA Lens could not load the automation", error);
-      this._setStatus("Could not read automation config. Admin access is required.", true);
+      const message =
+        error?.message
+        || error?.code
+        || (typeof error === "string" ? error : null)
+        || "Unknown Home Assistant WebSocket error";
+      this._setStatus(`Could not read automation: ${message}`, true);
     }
   }
 
