@@ -32,3 +32,5 @@ jobs:
           git add -A
           git diff --cached --quiet || git commit -m "feat: bootstrap HA Lens MVP"
           git push
+
+# trigger bootstrap
