@@ -37,9 +37,7 @@ class HaLensPanel extends HTMLElement {
   }
 
   _viewerUrl() {
-    return this._panel?.config?.viewer_url
-      || this._panel?.config?.standalone_url
-      || DEFAULT_VIEWER_URL;
+    return this._panel?.config?.viewer_url || DEFAULT_VIEWER_URL;
   }
 
   _embeddedUrl() {
