@@ -304,20 +304,38 @@ class HaLensPanel extends HTMLElement {
     this._setStatus("Loading automation…", false);
 
     try {
-      const result = await this._hass.callWS({
-        type: "automation/config",
-        entity_id: entityId,
-      });
+      const state = this._hass.states?.[entityId];
+      const automationId = state?.attributes?.id;
+      let config;
 
-      if (!result?.config) throw new Error("Home Assistant returned no automation config.");
+      if (automationId != null && this._hass.callApi) {
+        try {
+          config = await this._hass.callApi(
+            "GET",
+            `config/automation/config/${encodeURIComponent(String(automationId))}`,
+          );
+        } catch (error) {
+          if (error?.status_code !== 404) throw error;
+        }
+      }
 
-      const entityMetadata = await this._entityMetadata(result.config);
+      if (!config) {
+        const result = await this._hass.callWS({
+          type: "automation/config",
+          entity_id: entityId,
+        });
+        config = result?.config;
+      }
+
+      if (!config) throw new Error("Home Assistant returned no automation config.");
+
+      const entityMetadata = await this._entityMetadata(config);
 
       this._pendingMessage = {
         type: "ha-lens:automation",
         version: 1,
         entityId,
-        config: result.config,
+        config,
         entityMetadata,
       };
 
