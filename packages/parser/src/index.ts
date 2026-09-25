@@ -26,33 +26,112 @@ const entityText = (value: unknown): string => {
   return "";
 };
 
+const compactValue = (value: unknown): string => {
+  if (value == null) return "";
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return value.map(compactValue).filter(Boolean).join(", ");
+  if (typeof value === "object") {
+    const record = value as UnknownRecord;
+    const parts = ["hours", "minutes", "seconds"].flatMap((key) =>
+      record[key] != null ? [`${key[0]}=${String(record[key])}`] : [],
+    );
+    return parts.length ? parts.join(" ") : JSON.stringify(value);
+  }
+  return String(value);
+};
+
+const durationSuffix = (value: unknown): string => {
+  const duration = compactValue(value);
+  return duration ? ` for ${duration}` : "";
+};
+
+const offsetSuffix = (value: unknown): string => {
+  const offset = compactValue(value);
+  return offset ? ` (${offset})` : "";
+};
+
+const timeWindow = (raw: UnknownRecord): string => {
+  const after = compactValue(raw.after);
+  const before = compactValue(raw.before);
+  const weekdays = Array.isArray(raw.weekday) ? raw.weekday.map(String).join(", ") : compactValue(raw.weekday);
+  const range = after && before ? `${after}–${before}` : after ? `after ${after}` : before ? `before ${before}` : "Time";
+  return weekdays ? `${range} on ${weekdays}` : range;
+};
+
 function summarizeTrigger(raw: UnknownRecord): string {
   const type = stringValue(raw.trigger ?? raw.platform, "unknown");
   const entity = entityText(raw.entity_id);
+
   if (type === "state") {
-    const to = raw.to != null ? ` → ${String(raw.to)}` : " state change";
-    return `${entity || "Entity"}${to}`;
+    const from = raw.from != null ? compactValue(raw.from) : "";
+    const to = raw.to != null ? compactValue(raw.to) : "";
+    const transition = from && to ? `${from} → ${to}` : to ? `→ ${to}` : from ? `from ${from}` : "state changes";
+    const attribute = raw.attribute != null ? ` · ${String(raw.attribute)}` : "";
+    return `${entity || "Entity"}: ${transition}${attribute}${durationSuffix(raw.for)}`;
   }
-  if (type === "numeric_state") return `${entity || "Entity"} numeric state`;
-  if (type === "time") return `Time ${String(raw.at ?? "")}`.trim();
-  if (type === "time_pattern") return "Time pattern";
-  if (type === "sun") return `Sun ${String(raw.event ?? "event")}`;
-  if (type === "event") return `Event ${String(raw.event_type ?? "")}`.trim();
-  if (type === "template") return "Template becomes true";
+
+  if (type === "numeric_state") {
+    const parts = [
+      raw.above != null ? `> ${compactValue(raw.above)}` : "",
+      raw.below != null ? `< ${compactValue(raw.below)}` : "",
+    ].filter(Boolean);
+    return `${entity || "Entity"} ${parts.join(" and ") || "numeric state changes"}${durationSuffix(raw.for)}`;
+  }
+
+  if (type === "time") return `At ${compactValue(raw.at) || "configured time"}`;
+  if (type === "time_pattern") {
+    const pattern = ["hours", "minutes", "seconds"]
+      .flatMap((key) => raw[key] != null ? [`${key[0]}=${compactValue(raw[key])}`] : [])
+      .join(" ");
+    return `Time pattern${pattern ? `: ${pattern}` : ""}`;
+  }
+  if (type === "sun") return `${String(raw.event ?? "sun event")}${offsetSuffix(raw.offset)}`;
+  if (type === "event") return `Event: ${compactValue(raw.event_type) || "any configured event"}`;
+  if (type === "template") return `Template becomes true${durationSuffix(raw.for)}`;
+  if (type === "zone") return `${entity || "Entity"} ${String(raw.event ?? "enters/leaves")} ${entityText(raw.zone) || "zone"}`;
+  if (type === "calendar") return `${entity || "Calendar"}: ${String(raw.event ?? "calendar event")}`;
+  if (type === "mqtt") return `MQTT: ${compactValue(raw.topic) || "configured topic"}`;
+  if (type === "webhook") return "Webhook received";
+  if (type === "homeassistant") return `Home Assistant: ${compactValue(raw.event) || "event"}`;
+  if (type === "device") {
+    const domain = compactValue(raw.domain);
+    const eventType = compactValue(raw.type);
+    return `Device${domain || eventType ? `: ${[domain, eventType].filter(Boolean).join(" · ")}` : " trigger"}`;
+  }
   return `${type} trigger`;
 }
 
 function summarizeCondition(raw: UnknownRecord): string {
   const type = stringValue(raw.condition, "unknown");
   const entity = entityText(raw.entity_id);
-  if (type === "state") return `${entity || "Entity"} = ${String(raw.state ?? "?")}`;
-  if (type === "numeric_state") {
-    const parts = [raw.above != null ? `> ${String(raw.above)}` : "", raw.below != null ? `< ${String(raw.below)}` : ""].filter(Boolean);
-    return `${entity || "Entity"} ${parts.join(" and ")}`.trim();
+
+  if (type === "state") {
+    const attribute = raw.attribute != null ? ` · ${String(raw.attribute)}` : "";
+    return `${entity || "Entity"} = ${compactValue(raw.state) || "?"}${attribute}${durationSuffix(raw.for)}`;
   }
-  if (type === "time") return "Time condition";
-  if (type === "sun") return "Sun condition";
+  if (type === "numeric_state") {
+    const parts = [
+      raw.above != null ? `> ${compactValue(raw.above)}` : "",
+      raw.below != null ? `< ${compactValue(raw.below)}` : "",
+    ].filter(Boolean);
+    return `${entity || "Entity"} ${parts.join(" and ") || "numeric condition"}`.trim();
+  }
+  if (type === "time") return timeWindow(raw);
+  if (type === "sun") {
+    const parts = [
+      raw.after != null ? `after ${String(raw.after)}${offsetSuffix(raw.after_offset)}` : "",
+      raw.before != null ? `before ${String(raw.before)}${offsetSuffix(raw.before_offset)}` : "",
+    ].filter(Boolean);
+    return parts.length ? `Sun: ${parts.join(" and ")}` : "Sun condition";
+  }
   if (type === "template") return "Template condition";
+  if (type === "trigger") return `Triggered by: ${compactValue(raw.id) || "configured trigger id"}`;
+  if (type === "zone") return `${entity || "Entity"} in ${entityText(raw.zone) || "zone"}`;
+  if (type === "device") {
+    const domain = compactValue(raw.domain);
+    const conditionType = compactValue(raw.type);
+    return `Device condition${domain || conditionType ? `: ${[domain, conditionType].filter(Boolean).join(" · ")}` : ""}`;
+  }
   if (["and", "or", "not"].includes(type)) return `${type.toUpperCase()} condition`;
   return `${type} condition`;
 }

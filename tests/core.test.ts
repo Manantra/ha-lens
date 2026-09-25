@@ -52,6 +52,49 @@ describe("HA Lens core", () => {
     expect(paths.some((path) => path.title.startsWith("Stops at "))).toBe(true);
   });
 
+  it("produces readable trigger and condition summaries", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Readable
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+    from: "off"
+    to: "on"
+    for: "00:00:05"
+conditions:
+  - condition: time
+    after: "22:00:00"
+    before: "06:00:00"
+    weekday: [mon, tue, wed, thu, fri]
+actions: []
+`);
+    expect(automation.triggers[0].summary).toContain("off → on");
+    expect(automation.triggers[0].summary).toContain("00:00:05");
+    expect(automation.conditions[0].summary).toContain("22:00:00–06:00:00");
+    expect(automation.conditions[0].summary).toContain("mon");
+  });
+
+  it("uses choose conditions as branch labels when aliases are missing", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Choose labels
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+actions:
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.guest_mode
+            state: "on"
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: light.hall
+`);
+    const graph = buildAutomationGraph(automation);
+    expect(graph.edges.some((edge) => edge.label?.includes("input_boolean.guest_mode"))).toBe(true);
+  });
+
   it("builds a graph with branch labels", () => {
     const { automation } = parseAutomationYaml(yaml);
     const graph = buildAutomationGraph(automation);

@@ -46,7 +46,7 @@ function expandSequence(items: SequenceItem[], input: PathState[], maxPaths: num
         item.choices.forEach((choice, index) => {
           const chosen = cloneWith(state, {
             nodeId: item.id,
-            label: `${item.summary} → ${choice.alias || `option ${index + 1}`}`,
+            label: `${item.summary} → ${choice.alias || choice.conditions.map((condition) => condition.summary).join(" · ") || `option ${index + 1}`}`,
             detail: index > 0 ? "Earlier options did not match" : undefined,
           });
           next.push(...expandSequence(choice.sequence, [chosen], maxPaths));

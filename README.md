@@ -10,7 +10,7 @@ HA Lens is a read-only visualizer and analyzer for Home Assistant automations. P
 
 Visual flow editors are great for *building* automations. HA Lens is deliberately different: it is an inspection, explanation, documentation, and presentation tool for automations that already exist.
 
-- Visualize triggers, conditions, `if`, `choose`, waits, repeats, parallel blocks, and actions.
+- Visualize triggers, conditions, `if`, `choose`, waits, repeats, parallel blocks, and actions with human-readable summaries.
 - Explore possible execution paths without touching Home Assistant.
 - See referenced entities and actions in one place, then click an entity to highlight every relevant graph node.
 - Surface factual structural insights without pretending legal YAML is an error.

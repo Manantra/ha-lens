@@ -13,6 +13,7 @@
 - [x] structural insights
 - [x] presentation mode
 - [x] deterministic explain view
+- [x] richer trigger and condition labels
 - [x] unknown-node fallback
 - [x] SVG/PNG export
 - [ ] richer condition labels

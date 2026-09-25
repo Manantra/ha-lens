@@ -60,7 +60,8 @@ class Builder {
         this.connect(incoming, item.id);
         const branchOut: Incoming[] = [];
         item.choices.forEach((choice, index) => {
-          const label = choice.alias || `option ${index + 1}`;
+          const conditionLabel = choice.conditions.map((condition) => condition.summary).join(" · ");
+          const label = choice.alias || conditionLabel || `option ${index + 1}`;
           if (choice.sequence.length) branchOut.push(...this.buildSequence(choice.sequence, [{ id: item.id, label }]));
           else branchOut.push({ id: item.id, label });
         });
