@@ -36,7 +36,7 @@ jobs:
           VITE_BASE_PATH: /ha_lens_static/app/
       - name: Commit bundled frontend
         run: |
-          if git diff --quiet -- custom_components/ha_lens/frontend/app; then
+          if [ -z "$(git status --porcelain -- custom_components/ha_lens/frontend/app)" ]; then
             echo "Bundled frontend is already current."
             exit 0
           fi
