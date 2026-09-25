@@ -1,0 +1,20 @@
+{
+  "domain": "ha_lens",
+  "name": "HA Lens",
+  "version": "0.1.0",
+  "codeowners": [
+    "@Manantra"
+  ],
+  "config_flow": true,
+  "single_config_entry": true,
+  "dependencies": [
+    "frontend",
+    "http",
+    "panel_custom"
+  ],
+  "documentation": "https://github.com/Manantra/ha-lens",
+  "issue_tracker": "https://github.com/Manantra/ha-lens/issues",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "requirements": []
+}

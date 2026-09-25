@@ -1,0 +1,262 @@
+const DEFAULT_STANDALONE_URL = "https://manantra.github.io/ha-lens/";
+
+class HaLensPanel extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+    this._hass = null;
+    this._panel = null;
+    this._selected = "";
+    this._pendingMessage = null;
+    this._targetOrigin = new URL(DEFAULT_STANDALONE_URL).origin;
+    this._onWindowMessage = this._onWindowMessage.bind(this);
+  }
+
+  set hass(value) {
+    this._hass = value;
+    this._syncAutomations();
+  }
+
+  set panel(value) {
+    this._panel = value;
+    if (this.isConnected) this._applyPanelConfig();
+  }
+
+  set narrow(value) {
+    this.toggleAttribute("narrow", Boolean(value));
+  }
+
+  connectedCallback() {
+    this._render();
+    window.addEventListener("message", this._onWindowMessage);
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener("message", this._onWindowMessage);
+  }
+
+  _standaloneUrl() {
+    return this._panel?.config?.standalone_url || DEFAULT_STANDALONE_URL;
+  }
+
+  _embeddedUrl() {
+    const url = new URL(this._standaloneUrl());
+    url.searchParams.set("embedded", "1");
+    return url.toString();
+  }
+
+  _render() {
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host {
+          display: block;
+          width: 100%;
+          height: 100%;
+          min-height: 0;
+          color: var(--primary-text-color, #eef2ff);
+          background: var(--primary-background-color, #0b0d12);
+          font-family: var(--paper-font-body1_-_font-family, system-ui, sans-serif);
+        }
+
+        .shell {
+          height: 100%;
+          min-height: 0;
+          display: grid;
+          grid-template-rows: auto minmax(0, 1fr);
+          background: #0b0d12;
+        }
+
+        .toolbar {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          min-height: 58px;
+          padding: 10px 14px;
+          border-bottom: 1px solid rgba(127, 138, 160, .25);
+          background: #10131a;
+          box-sizing: border-box;
+        }
+
+        .brand {
+          min-width: max-content;
+          font-weight: 800;
+          color: #eef2ff;
+        }
+
+        .brand span {
+          color: #7c9cff;
+        }
+
+        select {
+          flex: 1;
+          min-width: 180px;
+          max-width: 620px;
+          height: 38px;
+          border: 1px solid #343b4a;
+          border-radius: 9px;
+          padding: 0 10px;
+          color: #e9eefc;
+          background: #181d27;
+          font: inherit;
+        }
+
+        .status {
+          margin-left: auto;
+          color: #8d98af;
+          font-size: 12px;
+          text-align: right;
+        }
+
+        .status[data-error="true"] {
+          color: #ff9ca7;
+        }
+
+        iframe {
+          width: 100%;
+          height: 100%;
+          min-height: 0;
+          border: 0;
+          background: #0b0d12;
+        }
+
+        @media (max-width: 720px) {
+          .toolbar {
+            align-items: stretch;
+            flex-wrap: wrap;
+          }
+
+          .brand {
+            width: 100%;
+          }
+
+          select {
+            max-width: none;
+          }
+
+          .status {
+            width: 100%;
+            margin-left: 0;
+            text-align: left;
+          }
+        }
+      </style>
+      <div class="shell">
+        <div class="toolbar">
+          <div class="brand"><span>◉</span> HA Lens</div>
+          <select aria-label="Home Assistant automation">
+            <option value="">Select an automation…</option>
+          </select>
+          <div class="status">Read-only · select an automation</div>
+        </div>
+        <iframe title="HA Lens automation analyzer"></iframe>
+      </div>
+    `;
+
+    this._select = this.shadowRoot.querySelector("select");
+    this._status = this.shadowRoot.querySelector(".status");
+    this._frame = this.shadowRoot.querySelector("iframe");
+
+    this._select.addEventListener("change", () => {
+      this._selected = this._select.value;
+      if (this._selected) void this._loadAutomation(this._selected);
+    });
+
+    this._frame.addEventListener("load", () => this._sendPending());
+    this._applyPanelConfig();
+    this._syncAutomations();
+  }
+
+  _applyPanelConfig() {
+    if (!this._frame) return;
+    const standaloneUrl = this._standaloneUrl();
+    this._targetOrigin = new URL(standaloneUrl).origin;
+    const nextUrl = this._embeddedUrl();
+    if (this._frame.src !== nextUrl) this._frame.src = nextUrl;
+  }
+
+  _automations() {
+    if (!this._hass?.states) return [];
+
+    return Object.values(this._hass.states)
+      .filter((state) => state.entity_id.startsWith("automation."))
+      .map((state) => ({
+        entityId: state.entity_id,
+        name: state.attributes?.friendly_name || state.entity_id,
+      }))
+      .sort((left, right) => left.name.localeCompare(right.name));
+  }
+
+  _syncAutomations() {
+    if (!this._select) return;
+    const automations = this._automations();
+    const previous = this._selected || this._select.value;
+
+    this._select.replaceChildren();
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = automations.length ? "Select an automation…" : "No automations found";
+    this._select.append(placeholder);
+
+    for (const automation of automations) {
+      const option = document.createElement("option");
+      option.value = automation.entityId;
+      option.textContent = automation.name;
+      this._select.append(option);
+    }
+
+    if (automations.some((automation) => automation.entityId === previous)) {
+      this._select.value = previous;
+      this._selected = previous;
+    }
+  }
+
+  async _loadAutomation(entityId) {
+    if (!this._hass?.connection) return;
+
+    this._setStatus("Loading automation…", false);
+
+    try {
+      const result = await this._hass.connection.sendMessagePromise({
+        type: "automation/config",
+        entity_id: entityId,
+      });
+
+      if (!result?.config) throw new Error("Home Assistant returned no automation config.");
+
+      this._pendingMessage = {
+        type: "ha-lens:automation",
+        version: 1,
+        entityId,
+        config: result.config,
+      };
+
+      this._sendPending();
+      const selected = this._automations().find((automation) => automation.entityId === entityId);
+      this._setStatus(selected ? selected.name : entityId, false);
+    } catch (error) {
+      console.error("HA Lens could not load the automation", error);
+      this._setStatus("Could not read automation config. Admin access is required.", true);
+    }
+  }
+
+  _sendPending() {
+    if (!this._pendingMessage || !this._frame?.contentWindow) return;
+    this._frame.contentWindow.postMessage(this._pendingMessage, this._targetOrigin);
+  }
+
+  _onWindowMessage(event) {
+    if (!this._frame?.contentWindow || event.source !== this._frame.contentWindow) return;
+    if (event.origin !== this._targetOrigin) return;
+    if (event.data?.type === "ha-lens:ready") this._sendPending();
+  }
+
+  _setStatus(message, error) {
+    if (!this._status) return;
+    this._status.textContent = message;
+    this._status.dataset.error = error ? "true" : "false";
+  }
+}
+
+if (!customElements.get("ha-lens-panel")) {
+  customElements.define("ha-lens-panel", HaLensPanel);
+}

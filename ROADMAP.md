@@ -32,10 +32,12 @@
 
 ## v0.3 — Home Assistant companion
 
-- optional HACS panel
-- select an existing automation directly
-- friendly names, icons, devices, areas
-- no write-back in the first companion release
+- [x] optional HACS-compatible panel preview
+- [x] select an existing automation directly
+- [x] read automation config through Home Assistant's existing WebSocket API
+- [ ] bundle the full visualizer locally for offline use
+- [ ] friendly names, icons, devices, areas
+- [x] no write-back in the first companion release
 
 ## Later
 

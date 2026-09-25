@@ -1,4 +1,4 @@
-import { parse } from "yaml";
+import { parse, stringify } from "yaml";
 import type {
   AutomationModel,
   ChooseBranch,
@@ -321,4 +321,9 @@ export function parseAutomationYaml(source: string): ParseResult {
 
   if (!triggers.length) warnings.push("No trigger was found. This may be a script-like sequence or manually invoked automation.");
   return { automation, warnings };
+}
+
+
+export function serializeAutomationYaml(value: unknown): string {
+  return stringify(value, { lineWidth: 0 });
 }

@@ -1,8 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { analyzeAutomation, explainAutomation } from "@ha-lens/analyzer";
 import { buildAutomationGraph } from "@ha-lens/graph";
 import { automationGraphToMermaid } from "@ha-lens/exporter";
-import { parseAutomationYaml } from "@ha-lens/parser";
+import { parseAutomationYaml, serializeAutomationYaml } from "@ha-lens/parser";
 import { enumerateExecutionPaths } from "@ha-lens/paths";
 import type { ExecutionPath } from "@ha-lens/model";
 import { exportAutomationGraph, type GraphExportFormat } from "./exportGraph";
@@ -19,6 +19,36 @@ export function App() {
   const [presentation, setPresentation] = useState(false);
   const [exporting, setExporting] = useState<GraphExportFormat | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+
+  useEffect(() => {
+    if (window.parent === window) return;
+
+    let parentOrigin: string | null = null;
+    try {
+      parentOrigin = document.referrer ? new URL(document.referrer).origin : null;
+    } catch {
+      parentOrigin = null;
+    }
+
+    const receiveAutomation = (event: MessageEvent<unknown>) => {
+      if (event.source !== window.parent) return;
+      if (parentOrigin && event.origin !== parentOrigin) return;
+      if (!event.data || typeof event.data !== "object") return;
+
+      const message = event.data as { type?: string; config?: unknown };
+      if (message.type !== "ha-lens:automation" || !message.config || typeof message.config !== "object") return;
+
+      setYaml(serializeAutomationYaml(message.config));
+      setSelectedPath(null);
+      setSelectedEntity(null);
+      setTab("summary");
+    };
+
+    window.addEventListener("message", receiveAutomation);
+    window.parent.postMessage({ type: "ha-lens:ready", version: 1 }, parentOrigin ?? "*");
+
+    return () => window.removeEventListener("message", receiveAutomation);
+  }, []);
 
   const result = useMemo(() => {
     try {

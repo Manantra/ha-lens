@@ -13,6 +13,13 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: 22
+      - name: Validate HACS companion
+        run: |
+          python -m compileall -q custom_components/ha_lens
+          python -m json.tool custom_components/ha_lens/manifest.json > /dev/null
+          python -m json.tool custom_components/ha_lens/strings.json > /dev/null
+          python -m json.tool hacs.json > /dev/null
+          node --check custom_components/ha_lens/frontend/ha-lens-panel.js
       - run: npm install
       - run: npm run typecheck
       - run: npm test

@@ -1,0 +1,14 @@
+{
+  "title": "HA Lens",
+  "config": {
+    "step": {
+      "user": {
+        "title": "HA Lens hinzufügen",
+        "description": "Fügt den schreibgeschützten HA-Lens-Automationsanalysator zur Home-Assistant-Seitenleiste hinzu."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Es kann nur eine HA-Lens-Instanz eingerichtet werden."
+    }
+  }
+}

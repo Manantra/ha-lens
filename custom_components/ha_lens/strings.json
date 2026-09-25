@@ -1,0 +1,14 @@
+{
+  "title": "HA Lens",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add HA Lens",
+        "description": "Adds the read-only HA Lens automation analyzer to the Home Assistant sidebar."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Only one HA Lens instance can be configured."
+    }
+  }
+}
