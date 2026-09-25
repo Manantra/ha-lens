@@ -1,0 +1,29 @@
+name: Bug report
+description: Report a parsing, analysis, path, graph, or UI problem
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: textarea
+    id: yaml
+    attributes:
+      label: Minimal automation YAML
+      description: Remove secrets, tokens, private URLs, and personally identifying values.
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / version
