@@ -143,7 +143,7 @@ export function App() {
       <section className="workspace">
         <aside className="yaml-panel panel">
           <div className="panel__header"><strong>Automation YAML</strong><span>local only</span></div>
-          <textarea value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
+          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
         </aside>
 
         <section className="graph-panel panel">

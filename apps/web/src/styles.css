@@ -266,3 +266,13 @@ button.ghost { background: transparent; color: #dce3f5; }
     overflow: visible;
   }
 }
+
+
+.app-shell--embedded .react-flow__minimap {
+  display: none;
+}
+
+.yaml-panel textarea {
+  white-space: pre;
+  overflow: auto;
+}
