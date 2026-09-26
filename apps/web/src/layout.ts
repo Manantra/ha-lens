@@ -4,7 +4,12 @@ import type { AutomationGraph } from "@ha-lens/model";
 
 const elk = new ELK();
 const WIDTH = 250;
-const HEIGHT = 88;
+const DEFAULT_HEIGHT = 104;
+const COMPACT_HEIGHT = 58;
+
+function nodeHeight(kind: string): number {
+  return kind === "merge" ? COMPACT_HEIGHT : DEFAULT_HEIGHT;
+}
 
 export async function layoutGraph(graph: AutomationGraph): Promise<{ nodes: Node[]; edges: Edge[] }> {
   const result = await elk.layout({
@@ -16,7 +21,7 @@ export async function layoutGraph(graph: AutomationGraph): Promise<{ nodes: Node
       "elk.layered.spacing.nodeNodeBetweenLayers": "70",
       "elk.edgeRouting": "ORTHOGONAL",
     },
-    children: graph.nodes.map((node) => ({ id: node.id, width: WIDTH, height: HEIGHT })),
+    children: graph.nodes.map((node) => ({ id: node.id, width: WIDTH, height: nodeHeight(node.kind) })),
     edges: graph.edges.map((edge) => ({ id: edge.id, sources: [edge.source], targets: [edge.target] })),
   });
 

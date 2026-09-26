@@ -765,3 +765,37 @@ button.ghost { background: transparent; color: #dce3f5; }
     border-left: 1px solid #28303e;
   }
 }
+
+
+/* Graph node text containment */
+.lens-node {
+  min-height: 104px;
+  padding: 15px 16px;
+  overflow: hidden;
+}
+.lens-node__kind {
+  margin-bottom: 7px;
+}
+.lens-node__label {
+  display: -webkit-box;
+  max-width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-overflow: ellipsis;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+.lens-node__subtitle {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lens-node--merge {
+  min-height: 58px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
