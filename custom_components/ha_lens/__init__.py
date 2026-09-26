@@ -45,67 +45,23 @@ def websocket_automations(
             else None
         )
         raw_config = automation.raw_config
-        automation_name = (
-            raw_config.get("alias")
-            if isinstance(raw_config, dict)
-            else None
-        )
+        if not isinstance(raw_config, dict) or not raw_config:
+            continue
+
+        config = dict(raw_config)
+        automation_name = config.get("alias")
 
         automations.append(
             {
                 "entity_id": entity_id,
                 "name": automation_name or friendly_name or automation.name or entity_id,
                 "id": automation.unique_id,
-                "has_config": raw_config is not None,
-                "config": raw_config,
+                "config": config,
             }
         )
 
     automations.sort(key=lambda item: item["name"].casefold())
     connection.send_result(msg["id"], automations)
-
-
-@websocket_api.websocket_command(
-    {"type": "ha_lens/automation/config", "entity_id": str}
-)
-@websocket_api.require_admin
-def websocket_automation_config(
-    hass: HomeAssistant,
-    connection: websocket_api.ActiveConnection,
-    msg: dict,
-) -> None:
-    """Return the raw config of a loaded automation without modifying it."""
-    component = hass.data.get(AUTOMATION_DATA_COMPONENT)
-    if component is None:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "Automation component not loaded"
-        )
-        return
-
-    automation = component.get_entity(msg["entity_id"])
-    if automation is None:
-        automation = next(
-            (
-                item
-                for item in component.entities
-                if item.entity_id == msg["entity_id"]
-            ),
-            None,
-        )
-
-    if automation is None:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "Automation entity not loaded"
-        )
-        return
-
-    if automation.raw_config is None:
-        connection.send_error(
-            msg["id"], websocket_api.ERR_NOT_FOUND, "Automation has no raw config"
-        )
-        return
-
-    connection.send_result(msg["id"], {"config": automation.raw_config})
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -121,7 +77,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     if not data.get("websocket_registered"):
         websocket_api.async_register_command(hass, websocket_automations)
-        websocket_api.async_register_command(hass, websocket_automation_config)
         data["websocket_registered"] = True
 
     if frontend.async_panel_exists(hass, PANEL_URL):

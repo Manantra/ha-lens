@@ -195,7 +195,12 @@ class HaLensPanel extends HTMLElement {
     this._automationListPromise = this._hass.callWS({ type: "ha_lens/automations" })
       .then((items) => {
         this._automationItems = (Array.isArray(items) ? items : [])
-          .filter((item) => item?.entity_id && item?.has_config !== false)
+          .filter((item) =>
+            item?.entity_id
+            && item?.config
+            && typeof item.config === "object"
+            && !Array.isArray(item.config)
+          )
           .map((item) => ({
             entityId: item.entity_id,
             name: item.name || item.entity_id,
@@ -336,17 +341,11 @@ class HaLensPanel extends HTMLElement {
 
     try {
       const selected = this._automations().find((automation) => automation.entityId === entityId);
-      let config = selected?.config ?? null;
+      const config = selected?.config ?? null;
 
       if (!config) {
-        const result = await this._hass.callWS({
-          type: "ha_lens/automation/config",
-          entity_id: entityId,
-        });
-        config = result?.config ?? null;
+        throw new Error(`No loaded config for ${entityId}. Refresh HA Lens after Home Assistant reloads automations.`);
       }
-
-      if (!config) throw new Error("Home Assistant returned no automation config.");
 
       const entityMetadata = await this._entityMetadata(config);
 
