@@ -37,6 +37,7 @@
 - [x] read automation config through Home Assistant's existing WebSocket API
 - [x] bundle the full visualizer locally for offline use
 - [x] friendly names, areas, device metadata and icon identifiers
+- [x] clearer entity metadata cards and friendly-name sorting
 - [ ] render Home Assistant / MDI icons visually
 - [x] no write-back in the first companion release
 - [x] search/filter automation picker

@@ -185,6 +185,15 @@ export function App() {
     [trace],
   );
 
+  const sortedEntities = useMemo(() => {
+    if (!result.ok) return [];
+    return [...result.analysis.entities].sort((left, right) => {
+      const leftName = entityMetadata[left]?.name || left;
+      const rightName = entityMetadata[right]?.name || right;
+      return leftName.localeCompare(rightName, undefined, { sensitivity: "base" });
+    });
+  }, [entityMetadata, result]);
+
   async function copyMermaid() {
     if (!result.ok) return;
     try {
@@ -327,30 +336,57 @@ export function App() {
               </div>
             ) : tab === "entities" ? (
               <>
-                <h3>Entities</h3>
-                <div className="token-list">
-                  {result.analysis.entities.length ? result.analysis.entities.map((entity) => {
+                <div className="entity-section-heading">
+                  <h3>Entities</h3>
+                  <span>{sortedEntities.length}</span>
+                </div>
+                <div className="entity-list">
+                  {sortedEntities.length ? sortedEntities.map((entity) => {
                     const metadata = entityMetadata[entity];
-                    const context = [metadata?.area, metadata?.device, metadata?.icon].filter(Boolean).join(" · ");
+                    const displayName = metadata?.name && metadata.name !== entity ? metadata.name : entity;
+                    const usageCount = result.analysis.entityUsages[entity]?.length ?? 0;
                     return (
                       <button
                         key={entity}
-                        className={`entity-token ${selectedEntity === entity ? "is-active" : ""}`}
-                        onClick={() => { setSelectedPath(null); setSelectedEntity(selectedEntity === entity ? null : entity); }}
+                        className={`entity-card ${selectedEntity === entity ? "is-active" : ""}`}
+                        onClick={() => {
+                          setSelectedTraceNodeId(null);
+                          setSelectedPath(null);
+                          setSelectedEntity(selectedEntity === entity ? null : entity);
+                        }}
                       >
-                        <span className="entity-token__identity">
+                        <span className="entity-card__main">
+                          <strong>{displayName}</strong>
                           <code>{entity}</code>
-                          {metadata?.name && metadata.name !== entity && <small>{metadata.name}</small>}
-                          {context && <small className="entity-token__context">{context}</small>}
+                          {(metadata?.area || metadata?.device) && (
+                            <span className="entity-card__meta">
+                              {metadata.area && <small><b>Area</b>{metadata.area}</small>}
+                              {metadata.device && <small><b>Device</b>{metadata.device}</small>}
+                            </span>
+                          )}
                         </span>
-                        <span>{result.analysis.entityUsages[entity]?.length ?? 0} node{(result.analysis.entityUsages[entity]?.length ?? 0) === 1 ? "" : "s"}</span>
+                        <span className="entity-card__usage" title={`Referenced by ${usageCount} graph node${usageCount === 1 ? "" : "s"}`}>
+                          <strong>{usageCount}</strong>
+                          <small>{usageCount === 1 ? "node" : "nodes"}</small>
+                        </span>
                       </button>
                     );
-                  }) : <span className="muted">No static entity IDs found.</span>}
+                  }) : <div className="empty-state">No static entity IDs found.</div>}
                 </div>
-                {selectedEntity && <div className="notice">Highlighting every graph node that references <code>{selectedEntity}</code>.</div>}
-                <h3>Actions</h3>
-                <div className="token-list">{result.analysis.actions.map((action) => <code key={action}>{action}</code>)}</div>
+                {selectedEntity && (
+                  <div className="notice entity-selection-notice">
+                    Highlighting references to <code>{selectedEntity}</code> in the graph.
+                  </div>
+                )}
+                <div className="entity-section-heading entity-section-heading--actions">
+                  <h3>Actions</h3>
+                  <span>{result.analysis.actions.length}</span>
+                </div>
+                <div className="action-list">
+                  {result.analysis.actions.length
+                    ? result.analysis.actions.map((action) => <code key={action}>{action}</code>)
+                    : <div className="empty-state">No service actions found.</div>}
+                </div>
               </>
             ) : tab === "trace" && trace ? (
               <div className="trace-inspector">
