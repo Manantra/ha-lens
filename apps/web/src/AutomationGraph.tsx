@@ -37,16 +37,12 @@ export function AutomationGraph({
     if (!flow || !nodes.length) return;
 
     const frame = window.requestAnimationFrame(() => {
-      const focused = focusNodeIds?.size
-        ? nodes.filter((node) => focusNodeIds.has(node.id))
-        : [];
-
       void flow.fitView({
-        nodes: focused.length ? focused : nodes,
-        padding: focused.length ? 0.7 : 0.18,
+        nodes,
+        padding: 0.18,
         duration: 260,
         minZoom: 0.2,
-        maxZoom: focused.length ? 1.15 : 1.35,
+        maxZoom: 1.35,
       });
     });
 
