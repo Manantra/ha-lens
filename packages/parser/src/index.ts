@@ -137,6 +137,20 @@ function summarizeCondition(raw: UnknownRecord): string {
 }
 
 function parseCondition(value: unknown, id: string): ConditionNode {
+  if (typeof value === "string") {
+    const raw: UnknownRecord = {
+      condition: "template",
+      value_template: value,
+    };
+    return {
+      id,
+      kind: "condition",
+      conditionType: "template",
+      summary: "Template condition",
+      raw,
+    };
+  }
+
   const raw = asRecord(value);
   const conditionType = stringValue(raw.condition, "unknown");
   const children = ["and", "or", "not"].includes(conditionType)
@@ -280,6 +294,17 @@ function parseSequenceItem(value: unknown, id: string): SequenceItem {
   if (raw.condition != null) {
     const condition = parseCondition(raw, `${id}.condition`);
     return { id, kind: "inline-condition", alias, summary: condition.summary, raw, condition };
+  }
+
+  if (typeof raw.scene === "string" && raw.scene.trim()) {
+    return {
+      id,
+      kind: "service",
+      alias,
+      action: "scene.turn_on",
+      summary: alias || `Activate scene → ${raw.scene}`,
+      raw,
+    };
   }
 
   const deviceAction = parseDeviceAction(raw, id, alias);

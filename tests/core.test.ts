@@ -220,6 +220,56 @@ actions:
   });
 
 
+
+  it("supports scene shortcut actions and string template conditions", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Hallway scenes
+triggers:
+  - platform: state
+    entity_id: binary_sensor.motion
+    from: "off"
+    to: "on"
+actions:
+  - choose:
+      - conditions:
+          - "{{ scene_morning != 'scene.none' }}"
+          - condition: time
+            after: "05:00:00"
+            before: "08:00:00"
+        sequence:
+          - scene: scene.flur_morgens
+      - conditions:
+          - "{{ scene_evening != 'scene.none' }}"
+        sequence:
+          - scene: scene.flur_abends
+    default:
+      - action: light.turn_on
+        target:
+          area_id: flur
+`);
+
+    const choose = automation.actions[0];
+    expect(choose.kind).toBe("choose");
+    if (choose.kind !== "choose") throw new Error("Expected choose action");
+
+    expect(choose.choices[0].conditions[0].conditionType).toBe("template");
+    expect(choose.choices[0].conditions[0].summary).toBe("Template condition");
+
+    const sceneAction = choose.choices[0].sequence[0];
+    expect(sceneAction.kind).toBe("service");
+    if (sceneAction.kind !== "service") throw new Error("Expected normalized scene service action");
+    expect(sceneAction.action).toBe("scene.turn_on");
+    expect(sceneAction.summary).toBe("Activate scene → scene.flur_morgens");
+
+    const graph = buildAutomationGraph(automation);
+    expect(graph.nodes.some((node) => node.kind === "unknown")).toBe(false);
+    expect(graph.nodes.some((node) => node.label === "Activate scene → scene.flur_morgens")).toBe(true);
+
+    const analysis = analyzeAutomation(automation);
+    expect(analysis.actions).toContain("scene.turn_on");
+    expect(analysis.entities).toEqual(expect.arrayContaining(["scene.flur_morgens", "scene.flur_abends"]));
+  });
+
   it("parses Home Assistant device actions as supported actions", () => {
     const { automation } = parseAutomationYaml(`
 alias: Lock door

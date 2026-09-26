@@ -19,6 +19,9 @@ function collectTemplateEntities(value: unknown, output: Set<string>) {
         const values = Array.isArray(child) ? child : [child];
         values.filter((item): item is string => typeof item === "string").forEach((item) => output.add(item));
       }
+      if (key === "scene" && typeof child === "string" && /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(child)) {
+        output.add(child);
+      }
       collectTemplateEntities(child, output);
     }
   }

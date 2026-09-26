@@ -324,6 +324,9 @@ class HaLensPanel extends HTMLElement {
             }
           }
         }
+        if (key === "scene" && typeof child === "string" && /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(child)) {
+          output.add(child);
+        }
         this._collectEntityIds(child, output);
       }
     }
