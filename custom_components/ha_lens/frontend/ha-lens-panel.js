@@ -48,6 +48,8 @@ class HaLensPanel extends HTMLElement {
 
   _embeddedUrl() {
     const url = new URL(this._viewerUrl(), window.location.origin);
+    const version = this._panel?.config?.version;
+    if (version) url.searchParams.set("v", String(version));
     url.searchParams.set("embedded", "1");
     return url.toString();
   }

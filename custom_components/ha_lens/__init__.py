@@ -1,5 +1,6 @@
 """HA Lens Home Assistant companion integration."""
 
+import json
 from pathlib import Path
 
 from homeassistant.components import frontend, panel_custom, websocket_api
@@ -84,9 +85,21 @@ def websocket_automations(
     )
 
 
+def _integration_version() -> str:
+    """Read the installed integration version for frontend cache busting."""
+    manifest_path = Path(__file__).parent / "manifest.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return "unknown"
+    version = manifest.get("version")
+    return version if isinstance(version, str) and version else "unknown"
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up HA Lens from a config entry."""
     data = hass.data.setdefault(DOMAIN, {})
+    version = _integration_version()
 
     if not data.get("static_registered"):
         frontend_path = Path(__file__).parent / "frontend"
@@ -108,9 +121,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         webcomponent_name=PANEL_ELEMENT,
         sidebar_title=PANEL_TITLE,
         sidebar_icon=PANEL_ICON,
-        module_url=f"{STATIC_URL}/ha-lens-panel.js",
+        module_url=f"{STATIC_URL}/ha-lens-panel.js?v={version}",
         require_admin=True,
-        config={"viewer_url": VIEWER_URL},
+        config={
+            "viewer_url": VIEWER_URL,
+            "version": version,
+        },
         config_panel_domain=DOMAIN,
     )
 
