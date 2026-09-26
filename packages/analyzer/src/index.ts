@@ -129,6 +129,14 @@ function collectRecordEntities(raw: UnknownRecord, output: Set<string>, ignoredK
       const values = Array.isArray(child) ? child : [child];
       values.filter((item): item is string => typeof item === "string").forEach((item) => output.add(item));
     }
+    if (
+      (key === "action" || key === "service")
+      && typeof child === "string"
+      && child.startsWith("script.")
+      && !scriptControlActions.has(child)
+    ) {
+      output.add(child);
+    }
     collectTemplateEntities(child, output);
   }
 }
