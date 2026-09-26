@@ -126,10 +126,16 @@ export interface Insight {
   message: string;
 }
 
+export interface EntityUsageDetail {
+  nodeId: string;
+  context: string;
+}
+
 export interface AnalysisResult {
   stats: AutomationStats;
   entities: string[];
   entityUsages: Record<string, string[]>;
+  entityUsageDetails: Record<string, EntityUsageDetail[]>;
   actions: string[];
   insights: Insight[];
 }

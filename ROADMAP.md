@@ -38,7 +38,8 @@
 - [x] bundle the full visualizer locally for offline use
 - [x] friendly names, areas, device metadata and icon identifiers
 - [x] clearer entity metadata cards and friendly-name sorting
-- [ ] render Home Assistant / MDI icons visually
+- [x] entity focus banner and nested usage context
+- [x] render offline domain-aware entity icons visually
 - [x] no write-back in the first companion release
 - [x] search/filter automation picker
 - [x] latest Home Assistant trace highlighting

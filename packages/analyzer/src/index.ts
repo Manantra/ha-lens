@@ -106,40 +106,117 @@ function inspectSequence(items: SequenceItem[], depth = 1): {
   return { actions, decisions, maxDepth, calls, insights };
 }
 
-function recordEntityUsage(raw: UnknownRecord, nodeId: string, usage: Map<string, Set<string>>) {
-  const entities = new Set<string>();
-  collectTemplateEntities(raw, entities);
-  for (const entity of entities) {
-    const ids = usage.get(entity) ?? new Set<string>();
-    ids.add(nodeId);
-    usage.set(entity, ids);
+type EntityUsageDetail = { nodeId: string; context: string };
+type EntityUsageMap = Map<string, EntityUsageDetail[]>;
+
+function collectRecordEntities(raw: UnknownRecord, output: Set<string>, ignoredKeys: Set<string> = new Set()) {
+  for (const [key, child] of Object.entries(raw)) {
+    if (ignoredKeys.has(key)) continue;
+    if (key === "entity_id") {
+      const values = Array.isArray(child) ? child : [child];
+      values.filter((item): item is string => typeof item === "string").forEach((item) => output.add(item));
+    }
+    collectTemplateEntities(child, output);
   }
 }
 
-function recordConditionUsage(condition: ConditionNode, usage: Map<string, Set<string>>) {
-  recordEntityUsage(condition.raw, condition.id, usage);
-  for (const child of condition.children ?? []) recordConditionUsage(child, usage);
+function recordEntityUsage(
+  raw: UnknownRecord,
+  nodeId: string,
+  context: string,
+  usage: EntityUsageMap,
+  ignoredKeys: string[] = [],
+) {
+  const entities = new Set<string>();
+  collectRecordEntities(raw, entities, new Set(ignoredKeys));
+  for (const entity of entities) {
+    const details = usage.get(entity) ?? [];
+    if (!details.some((detail) => detail.nodeId === nodeId && detail.context === context)) {
+      details.push({ nodeId, context });
+    }
+    usage.set(entity, details);
+  }
 }
 
-function recordSequenceUsage(items: SequenceItem[], usage: Map<string, Set<string>>) {
+function conditionLabel(condition: ConditionNode): string {
+  if (condition.alias) return condition.alias;
+  const labels: Record<string, string> = {
+    state: "State condition",
+    numeric_state: "Numeric state condition",
+    template: "Template condition",
+    time: "Time condition",
+    sun: "Sun condition",
+    trigger: "Trigger condition",
+    zone: "Zone condition",
+    device: "Device condition",
+    and: "AND condition",
+    or: "OR condition",
+    not: "NOT condition",
+  };
+  return labels[condition.conditionType] ?? condition.summary;
+}
+
+function recordConditionUsage(
+  condition: ConditionNode,
+  graphNodeId: string,
+  prefix: string[],
+  usage: EntityUsageMap,
+) {
+  const label = conditionLabel(condition);
+  const contextParts = [...prefix, label];
+  recordEntityUsage(
+    condition.raw,
+    graphNodeId,
+    contextParts.join(" → "),
+    usage,
+    condition.children?.length ? ["conditions"] : [],
+  );
+  for (const child of condition.children ?? []) {
+    recordConditionUsage(child, graphNodeId, contextParts, usage);
+  }
+}
+
+function recordSequenceUsage(items: SequenceItem[], usage: EntityUsageMap, prefix: string[] = []) {
   for (const item of items) {
-    recordEntityUsage(item.raw, item.id, usage);
+    const itemLabel = item.alias || item.summary;
+
     if (item.kind === "if") {
-      item.conditions.forEach((condition) => recordConditionUsage(condition, usage));
-      recordSequenceUsage(item.then, usage);
-      recordSequenceUsage(item.else, usage);
+      recordEntityUsage(item.raw, item.id, [...prefix, itemLabel].join(" → "), usage, ["if", "then", "else"]);
+      item.conditions.forEach((condition) => recordConditionUsage(condition, item.id, [...prefix, itemLabel], usage));
+      recordSequenceUsage(item.then, usage, [...prefix, itemLabel, "Then"]);
+      recordSequenceUsage(item.else, usage, [...prefix, itemLabel, "Else"]);
     } else if (item.kind === "choose") {
-      for (const choice of item.choices) {
-        choice.conditions.forEach((condition) => recordConditionUsage(condition, usage));
-        recordSequenceUsage(choice.sequence, usage);
-      }
-      recordSequenceUsage(item.default, usage);
+      recordEntityUsage(item.raw, item.id, [...prefix, itemLabel].join(" → "), usage, ["choose", "default"]);
+      item.choices.forEach((choice, index) => {
+        const choiceLabel = choice.alias || `Option ${index + 1}`;
+        choice.conditions.forEach((condition) =>
+          recordConditionUsage(condition, item.id, [...prefix, itemLabel, choiceLabel], usage)
+        );
+        recordSequenceUsage(choice.sequence, usage, [...prefix, itemLabel, choiceLabel]);
+      });
+      recordSequenceUsage(item.default, usage, [...prefix, itemLabel, "Default"]);
     } else if (item.kind === "repeat") {
-      recordSequenceUsage(item.sequence, usage);
+      const repeatRaw = item.raw.repeat;
+      if (repeatRaw && typeof repeatRaw === "object" && !Array.isArray(repeatRaw)) {
+        recordEntityUsage(
+          repeatRaw as UnknownRecord,
+          item.id,
+          [...prefix, itemLabel, "Loop control"].join(" → "),
+          usage,
+          ["sequence"],
+        );
+      }
+      recordEntityUsage(item.raw, item.id, [...prefix, itemLabel].join(" → "), usage, ["repeat"]);
+      recordSequenceUsage(item.sequence, usage, [...prefix, itemLabel, "Loop body"]);
     } else if (item.kind === "parallel") {
-      item.branches.forEach((branch) => recordSequenceUsage(branch, usage));
+      recordEntityUsage(item.raw, item.id, [...prefix, itemLabel].join(" → "), usage, ["parallel"]);
+      item.branches.forEach((branch, index) =>
+        recordSequenceUsage(branch, usage, [...prefix, itemLabel, `Branch ${index + 1}`])
+      );
     } else if (item.kind === "inline-condition") {
-      recordConditionUsage(item.condition, usage);
+      recordConditionUsage(item.condition, item.id, prefix, usage);
+    } else {
+      recordEntityUsage(item.raw, item.id, [...prefix, itemLabel].join(" → "), usage);
     }
   }
 }
@@ -203,9 +280,13 @@ export function analyzeAutomation(automation: AutomationModel): AnalysisResult {
 
   const conditionStats = automation.conditions.map(countCondition);
   const sequenceInfo = inspectSequence(automation.actions);
-  const entityUsage = new Map<string, Set<string>>();
-  automation.triggers.forEach((trigger) => recordEntityUsage(trigger.raw, trigger.id, entityUsage));
-  automation.conditions.forEach((condition) => recordConditionUsage(condition, entityUsage));
+  const entityUsage = new Map<string, EntityUsageDetail[]>();
+  automation.triggers.forEach((trigger) =>
+    recordEntityUsage(trigger.raw, trigger.id, `Trigger → ${trigger.alias || trigger.summary}`, entityUsage)
+  );
+  automation.conditions.forEach((condition) =>
+    recordConditionUsage(condition, condition.id, ["Top-level condition"], entityUsage)
+  );
   recordSequenceUsage(automation.actions, entityUsage);
   const conditionCount = conditionStats.reduce((sum, value) => sum + value.count, 0);
   const conditionDepth = Math.max(0, ...conditionStats.map((value) => value.depth));
@@ -223,7 +304,12 @@ export function analyzeAutomation(automation: AutomationModel): AnalysisResult {
     entityUsages: Object.fromEntries(
       [...entityUsage.entries()]
         .sort(([left], [right]) => left.localeCompare(right))
-        .map(([entity, ids]) => [entity, [...ids]]),
+        .map(([entity, details]) => [entity, [...new Set(details.map((detail) => detail.nodeId))]]),
+    ),
+    entityUsageDetails: Object.fromEntries(
+      [...entityUsage.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([entity, details]) => [entity, details]),
     ),
     actions: [...new Set(sequenceInfo.calls)].sort(),
     insights: sequenceInfo.insights,

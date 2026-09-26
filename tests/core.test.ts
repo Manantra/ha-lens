@@ -149,6 +149,41 @@ actions:
     expect(graph.edges.some((edge) => edge.label?.includes("input_boolean.guest_mode"))).toBe(true);
   });
 
+
+  it("maps nested entity references to visible graph nodes with readable contexts", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Nested usage
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+actions:
+  - choose:
+      - conditions:
+          - condition: numeric_state
+            entity_id: sensor.lux
+            below: 50
+        sequence:
+          - action: light.turn_on
+            target:
+              entity_id: light.hall
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.guest_mode
+            state: "on"
+        sequence: []
+`);
+    const analysis = analyzeAutomation(automation);
+
+    expect(analysis.entityUsages["sensor.lux"]).toEqual(["actions.0"]);
+    expect(analysis.entityUsageDetails["sensor.lux"]).toEqual([
+      {
+        nodeId: "actions.0",
+        context: "Choose (2 options) → Option 1 → Numeric state condition",
+      },
+    ]);
+    expect(analysis.entityUsages["light.hall"]).toEqual(["actions.0.choose.0.sequence.0"]);
+  });
+
   it("exports graph structure as Mermaid", () => {
     const { automation } = parseAutomationYaml(yaml);
     const graph = buildAutomationGraph(automation);

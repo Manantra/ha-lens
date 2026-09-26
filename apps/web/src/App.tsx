@@ -96,6 +96,35 @@ function formatTraceTime(value?: string | null): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+function EntityIcon({ entityId, icon }: { entityId: string; icon?: string | null }) {
+  const domain = entityId.split(".", 1)[0];
+  const hint = `${icon || ""} ${domain}`.toLowerCase();
+  const common = { viewBox: "0 0 24 24", "aria-hidden": true } as const;
+
+  let glyph;
+  if (/motion|occupancy|presence|binary_sensor/.test(hint)) {
+    glyph = <><circle cx="12" cy="12" r="2.2" /><path d="M7.5 8.2a6 6 0 0 0 0 7.6M16.5 8.2a6 6 0 0 1 0 7.6M4.5 5.7a10 10 0 0 0 0 12.6M19.5 5.7a10 10 0 0 1 0 12.6" /></>;
+  } else if (/light|bulb/.test(hint)) {
+    glyph = <><path d="M9 18h6M10 21h4M8.7 14.8C7 13.7 6 11.8 6 9.7A6 6 0 0 1 18 9.7c0 2.1-1 4-2.7 5.1-.8.5-1.3 1.3-1.3 2.2h-4c0-.9-.5-1.7-1.3-2.2Z" /></>;
+  } else if (/temperature|therm|climate/.test(hint)) {
+    glyph = <><path d="M10 5a2 2 0 0 1 4 0v8.2a4 4 0 1 1-4 0V5Z" /><path d="M12 8v7" /></>;
+  } else if (/person|account/.test(hint)) {
+    glyph = <><circle cx="12" cy="8" r="3" /><path d="M5.5 20c.8-4 3-6 6.5-6s5.7 2 6.5 6" /></>;
+  } else if (/switch|input_boolean/.test(hint)) {
+    glyph = <><rect x="4" y="7" width="16" height="10" rx="5" /><circle cx="15" cy="12" r="3" /></>;
+  } else if (/water|humidity|moisture/.test(hint)) {
+    glyph = <><path d="M12 3s5 5.7 5 10a5 5 0 0 1-10 0c0-4.3 5-10 5-10Z" /></>;
+  } else {
+    glyph = <><circle cx="12" cy="12" r="7.5" /><path d="M8 14.5 11 12l2 1.5 3-4" /></>;
+  }
+
+  return (
+    <span className="entity-card__icon" title={icon || `${domain} entity`}>
+      <svg {...common} fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{glyph}</svg>
+    </span>
+  );
+}
+
 export function App() {
   const [yaml, setYaml] = useState(sampleAutomation);
   const [tab, setTab] = useState<Tab>("summary");
@@ -194,6 +223,20 @@ export function App() {
     });
   }, [entityMetadata, result]);
 
+  const entityFocus = useMemo(() => {
+    if (!result.ok || !selectedEntity) return null;
+    const metadata = entityMetadata[selectedEntity];
+    const nodeIds = result.analysis.entityUsages[selectedEntity] ?? [];
+    const details = result.analysis.entityUsageDetails[selectedEntity] ?? [];
+    return {
+      entityId: selectedEntity,
+      name: metadata?.name && metadata.name !== selectedEntity ? metadata.name : selectedEntity,
+      nodeCount: nodeIds.length,
+      referenceCount: details.length,
+      details,
+    };
+  }, [entityMetadata, result, selectedEntity]);
+
   async function copyMermaid() {
     if (!result.ok) return;
     try {
@@ -278,6 +321,21 @@ export function App() {
             </div>
           </div>
           <div className="graph-area">
+            {entityFocus && (
+              <div className="entity-focus-banner">
+                <div className="entity-focus-banner__icon">◎</div>
+                <div className="entity-focus-banner__body">
+                  <strong>Entity focus active · {entityFocus.name}</strong>
+                  <span>
+                    {entityFocus.nodeCount} matching graph node{entityFocus.nodeCount === 1 ? "" : "s"} highlighted
+                    {entityFocus.referenceCount !== entityFocus.nodeCount ? ` · ${entityFocus.referenceCount} specific references` : ""}.
+                    Unrelated nodes are dimmed.
+                  </span>
+                  <code>{entityFocus.entityId}</code>
+                </div>
+                <button className="entity-focus-banner__clear" onClick={() => setSelectedEntity(null)}>Clear focus</button>
+              </div>
+            )}
             {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
           </div>
         </section>
@@ -345,18 +403,24 @@ export function App() {
                     const metadata = entityMetadata[entity];
                     const displayName = metadata?.name && metadata.name !== entity ? metadata.name : entity;
                     const usageCount = result.analysis.entityUsages[entity]?.length ?? 0;
+                    const usageDetails = result.analysis.entityUsageDetails[entity] ?? [];
+                    const focused = selectedEntity === entity;
                     return (
                       <button
                         key={entity}
-                        className={`entity-card ${selectedEntity === entity ? "is-active" : ""}`}
+                        className={`entity-card ${focused ? "is-active" : ""}`}
                         onClick={() => {
                           setSelectedTraceNodeId(null);
                           setSelectedPath(null);
-                          setSelectedEntity(selectedEntity === entity ? null : entity);
+                          setSelectedEntity(focused ? null : entity);
                         }}
                       >
+                        <EntityIcon entityId={entity} icon={metadata?.icon} />
                         <span className="entity-card__main">
-                          <strong>{displayName}</strong>
+                          <span className="entity-card__title-row">
+                            <strong>{displayName}</strong>
+                            {focused && <small className="entity-card__focused-badge">Focused</small>}
+                          </span>
                           <code>{entity}</code>
                           {(metadata?.area || metadata?.device) && (
                             <span className="entity-card__meta">
@@ -364,8 +428,16 @@ export function App() {
                               {metadata.device && <small><b>Device</b>{metadata.device}</small>}
                             </span>
                           )}
+                          {focused && usageDetails.length > 0 && (
+                            <span className="entity-card__contexts">
+                              <b>Used at</b>
+                              {usageDetails.map((detail, index) => (
+                                <small key={`${detail.nodeId}-${detail.context}-${index}`}>{detail.context}</small>
+                              ))}
+                            </span>
+                          )}
                         </span>
-                        <span className="entity-card__usage" title={`Referenced by ${usageCount} graph node${usageCount === 1 ? "" : "s"}`}>
+                        <span className="entity-card__usage" title={`Referenced by ${usageCount} visible graph node${usageCount === 1 ? "" : "s"}`}>
                           <strong>{usageCount}</strong>
                           <small>{usageCount === 1 ? "node" : "nodes"}</small>
                         </span>
@@ -373,11 +445,6 @@ export function App() {
                     );
                   }) : <div className="empty-state">No static entity IDs found.</div>}
                 </div>
-                {selectedEntity && (
-                  <div className="notice entity-selection-notice">
-                    Highlighting references to <code>{selectedEntity}</code> in the graph.
-                  </div>
-                )}
                 <div className="entity-section-heading entity-section-heading--actions">
                   <h3>Actions</h3>
                   <span>{result.analysis.actions.length}</span>
