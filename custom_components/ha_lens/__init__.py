@@ -51,6 +51,7 @@ def websocket_automations(
                 "name": friendly_name or automation.name or entity_id,
                 "id": automation.unique_id,
                 "has_config": automation.raw_config is not None,
+                "config": automation.raw_config,
             }
         )
 

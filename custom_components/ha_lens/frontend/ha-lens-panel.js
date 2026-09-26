@@ -200,6 +200,7 @@ class HaLensPanel extends HTMLElement {
             entityId: item.entity_id,
             name: item.name || item.entity_id,
             automationId: item.id ?? null,
+            config: item.config ?? null,
           }))
           .sort((left, right) => left.name.localeCompare(right.name));
         this._syncAutomations();
@@ -334,11 +335,16 @@ class HaLensPanel extends HTMLElement {
     this._setStatus("Loading automation…", false);
 
     try {
-      const result = await this._hass.callWS({
-        type: "ha_lens/automation/config",
-        entity_id: entityId,
-      });
-      const config = result?.config;
+      const selected = this._automations().find((automation) => automation.entityId === entityId);
+      let config = selected?.config ?? null;
+
+      if (!config) {
+        const result = await this._hass.callWS({
+          type: "ha_lens/automation/config",
+          entity_id: entityId,
+        });
+        config = result?.config ?? null;
+      }
 
       if (!config) throw new Error("Home Assistant returned no automation config.");
 
@@ -353,7 +359,6 @@ class HaLensPanel extends HTMLElement {
       };
 
       this._sendPending();
-      const selected = this._automations().find((automation) => automation.entityId === entityId);
       this._setStatus(selected ? selected.name : entityId, false);
     } catch (error) {
       console.error("HA Lens could not load the automation", error);
