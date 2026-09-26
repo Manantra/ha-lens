@@ -45,7 +45,8 @@
 ## Later
 
 - [x] first latest-trace overlay
-- [ ] richer trace detail and branch outcomes
+- [x] trace inspector with runtime steps and branch/result details
+- [ ] richer nested trace mapping and branch coverage
 - [ ] compare structure vs. last execution
 - automation diff visualization
 - optional lint rules with clearly documented semantics

@@ -290,3 +290,24 @@ button.ghost { background: transparent; color: #dce3f5; }
 .trace-card__error { color: #ffb0ba; font-size: 11px; line-height: 1.4; }
 .react-flow__node.is-traced .lens-node { border-color: #4fc37d; box-shadow: 0 0 0 1px rgba(79,195,125,.35), 0 10px 28px rgba(0,0,0,.22); }
 .react-flow__edge.is-traced path { stroke: #4fc37d; stroke-width: 2.4; }
+
+
+.trace-inspector { display: flex; flex-direction: column; gap: 12px; }
+.trace-overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.trace-overview > div { border: 1px solid #2a3c31; background: #121d17; border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.trace-overview span { color: #789287; font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+.trace-overview strong { color: #dff2e6; font-size: 11px; overflow-wrap: anywhere; }
+.trace-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #809187; font-size: 10px; }
+.trace-clear { padding: 5px 8px; font-size: 10px; }
+.trace-step-list { display: flex; flex-direction: column; gap: 6px; }
+.trace-step { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; padding: 9px 10px; border: 1px solid #29382f; background: #121a16; color: #d9e8df; text-align: left; }
+.trace-step:hover { border-color: #416752; }
+.trace-step.is-active { border-color: #50bd7a; box-shadow: 0 0 0 1px rgba(80,189,122,.25) inset; }
+.trace-step.is-unmapped { opacity: .68; cursor: default; border-style: dashed; }
+.trace-step__number { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; background: #1c3025; color: #8ed3aa; font-size: 9px; font-weight: 800; }
+.trace-step__body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.trace-step__body strong { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trace-step__body code { color: #6f8879; font-size: 9px; overflow-wrap: anywhere; }
+.trace-step__body small { color: #9db0a4; font-size: 9px; overflow-wrap: anywhere; }
+.trace-step__body .trace-step__error { color: #ff9eaa; }
+.trace-step__time { color: #708178; font-size: 9px; white-space: nowrap; }

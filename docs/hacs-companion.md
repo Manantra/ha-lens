@@ -10,6 +10,7 @@ The first companion release is intentionally read-only.
 - Shows a small diagnostic count for readable automations and entries hidden because Home Assistant exposes no usable raw configuration.
 - Supports filtering the automation picker by alias or entity ID.
 - Loads the latest Home Assistant trace when available and passes a compact, read-only trace summary to the viewer so executed graph nodes can be highlighted.
+- Provides a dedicated Trace inspector with chronological runtime events, result/choice/condition details, errors, and graph-node mapping.
 - Passes only the selected automation configuration plus metadata for referenced entities to the HA Lens viewer in the browser.
 - Does not register any write action and does not modify automation YAML.
 

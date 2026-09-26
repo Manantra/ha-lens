@@ -366,6 +366,22 @@ class HaLensPanel extends HTMLElement {
         run_id: latest.run_id,
       });
 
+      const traceEntries = Object.entries(extended?.trace || {});
+      const steps = traceEntries
+        .flatMap(([path, entries]) =>
+          (Array.isArray(entries) ? entries : []).map((entry, occurrence) => ({
+            path,
+            occurrence,
+            timestamp: entry?.timestamp || null,
+            error: entry?.error || null,
+            result: entry?.result ?? null,
+          }))
+        )
+        .sort((left, right) => {
+          const timeOrder = String(left.timestamp || "").localeCompare(String(right.timestamp || ""));
+          return timeOrder || left.path.localeCompare(right.path) || left.occurrence - right.occurrence;
+        });
+
       return {
         runId: extended?.run_id || latest.run_id,
         state: extended?.state || latest?.state || null,
@@ -375,7 +391,8 @@ class HaLensPanel extends HTMLElement {
         lastStep: extended?.last_step ?? latest?.last_step ?? null,
         error: extended?.error || latest?.error || null,
         notTriggered: Boolean(extended?.not_triggered ?? latest?.not_triggered),
-        paths: Object.keys(extended?.trace || {}),
+        paths: traceEntries.map(([path]) => path),
+        steps,
       };
     } catch (error) {
       console.warn("HA Lens could not load the latest automation trace", error);

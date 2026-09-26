@@ -9,13 +9,21 @@ import { exportAutomationGraph, type GraphExportFormat } from "./exportGraph";
 import { AutomationGraph } from "./AutomationGraph";
 import { sampleAutomation } from "./sample";
 
-type Tab = "summary" | "paths" | "entities" | "insights" | "explain";
+type Tab = "summary" | "paths" | "entities" | "trace" | "insights" | "explain";
 
 interface CompanionEntityMetadata {
   name?: string | null;
   icon?: string | null;
   area?: string | null;
   device?: string | null;
+}
+
+interface CompanionTraceStep {
+  path: string;
+  occurrence?: number;
+  timestamp?: string | null;
+  error?: string | null;
+  result?: unknown;
 }
 
 interface CompanionTrace {
@@ -28,31 +36,58 @@ interface CompanionTrace {
   error?: string | null;
   notTriggered?: boolean;
   paths: string[];
+  steps?: CompanionTraceStep[];
+}
+
+function tracePathToNodeId(path: string, nodeIds: string[]): string | null {
+  const available = new Set(nodeIds);
+  const parts = path.split("/").filter(Boolean);
+  if (!parts.length) return null;
+
+  if (parts[0] === "trigger") parts[0] = "triggers";
+  else if (parts[0] === "condition") parts[0] = "conditions";
+  else if (parts[0] === "action") parts[0] = "actions";
+  else return null;
+
+  while (parts.length) {
+    const candidate = parts.join(".");
+    if (available.has(candidate)) return candidate;
+    parts.pop();
+  }
+
+  return null;
 }
 
 function traceNodeIds(paths: string[], nodeIds: string[]): Set<string> {
-  const available = new Set(nodeIds);
   const output = new Set<string>();
-
   for (const path of paths) {
-    const parts = path.split("/").filter(Boolean);
-    if (!parts.length) continue;
-    if (parts[0] === "trigger") parts[0] = "triggers";
-    else if (parts[0] === "condition") parts[0] = "conditions";
-    else if (parts[0] === "action") parts[0] = "actions";
-    else continue;
+    const nodeId = tracePathToNodeId(path, nodeIds);
+    if (nodeId) output.add(nodeId);
+  }
+  return output;
+}
 
-    while (parts.length) {
-      const candidate = parts.join(".");
-      if (available.has(candidate)) {
-        output.add(candidate);
-        break;
-      }
-      parts.pop();
-    }
+function formatTraceResult(value: unknown): string | null {
+  if (value == null) return null;
+  if (typeof value !== "object") return String(value);
+
+  const record = value as Record<string, unknown>;
+  if (typeof record.result === "boolean") return record.result ? "condition: true" : "condition: false";
+  if (record.choice != null) return `choice: ${String(record.choice)}`;
+  if (record.timeout === true) return "timeout";
+  if (record.stop != null) return `stop: ${String(record.stop)}`;
+  if (record.delay != null) return `delay: ${String(record.delay)}`;
+  if (record.wait && typeof record.wait === "object") {
+    const wait = record.wait as Record<string, unknown>;
+    if (typeof wait.completed === "boolean") return wait.completed ? "wait completed" : "wait incomplete";
   }
 
-  return output;
+  try {
+    const serialized = JSON.stringify(value);
+    return serialized.length > 180 ? `${serialized.slice(0, 177)}…` : serialized;
+  } catch {
+    return "runtime result";
+  }
 }
 
 function formatTraceTime(value?: string | null): string {
@@ -72,6 +107,7 @@ export function App() {
   const [entityMetadata, setEntityMetadata] = useState<Record<string, CompanionEntityMetadata>>({});
   const [trace, setTrace] = useState<CompanionTrace | null>(null);
   const [showTrace, setShowTrace] = useState(false);
+  const [selectedTraceNodeId, setSelectedTraceNodeId] = useState<string | null>(null);
   const embedded = useMemo(() => new URLSearchParams(window.location.search).get("embedded") === "1", []);
 
   useEffect(() => {
@@ -103,6 +139,7 @@ export function App() {
       setShowTrace(Boolean(message.trace));
       setSelectedPath(null);
       setSelectedEntity(null);
+      setSelectedTraceNodeId(null);
       setTab("summary");
     };
 
@@ -126,13 +163,26 @@ export function App() {
   }, [yaml]);
 
   const highlightedNodeIds = useMemo(() => {
+    if (selectedTraceNodeId) return new Set([selectedTraceNodeId]);
     if (selectedEntity && result.ok) return new Set(result.analysis.entityUsages[selectedEntity] ?? []);
     return new Set(selectedPath?.steps.map((step) => step.nodeId) ?? []);
-  }, [result, selectedEntity, selectedPath]);
+  }, [result, selectedEntity, selectedPath, selectedTraceNodeId]);
 
   const tracedNodeIds = useMemo(
     () => result.ok && trace && showTrace ? traceNodeIds(trace.paths, result.graph.nodes.map((node) => node.id)) : new Set<string>(),
     [result, showTrace, trace],
+  );
+
+  const graphNodeById = useMemo(
+    () => result.ok ? new Map(result.graph.nodes.map((node) => [node.id, node])) : new Map(),
+    [result],
+  );
+
+  const tabs = useMemo<Tab[]>(
+    () => trace
+      ? ["summary", "paths", "entities", "trace", "insights", "explain"]
+      : ["summary", "paths", "entities", "insights", "explain"],
+    [trace],
   );
 
   async function copyMermaid() {
@@ -185,7 +235,7 @@ export function App() {
           <div className="tagline">See what your Home Assistant automation can do.</div>
         </div>
         <div className="topbar__actions">
-          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setEntityMetadata({}); setTrace(null); setShowTrace(false); }}>Load example</button>
+          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setEntityMetadata({}); setTrace(null); setShowTrace(false); setSelectedTraceNodeId(null); }}>Load example</button>
           <button className="ghost" disabled={!result.ok} onClick={() => void copyMermaid()}>{copyStatus === "copied" ? "Mermaid copied ✓" : copyStatus === "failed" ? "Copy failed" : "Copy Mermaid"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("svg")}>{exporting === "svg" ? "Exporting…" : "Export SVG"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
@@ -196,7 +246,7 @@ export function App() {
       <section className="workspace">
         <aside className="yaml-panel panel">
           <div className="panel__header"><strong>Automation YAML</strong><span>local only</span></div>
-          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setTrace(null); setShowTrace(false); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
+          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setTrace(null); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
         </aside>
 
         <section className="graph-panel panel">
@@ -206,7 +256,10 @@ export function App() {
               {trace && result.ok && (
                 <button
                   className={`trace-toggle ${showTrace ? "is-active" : ""}`}
-                  onClick={() => setShowTrace((value) => !value)}
+                  onClick={() => {
+                    setSelectedTraceNodeId(null);
+                    setShowTrace((value) => !value);
+                  }}
                   title="Highlight nodes touched by the latest Home Assistant trace"
                 >
                   Last run
@@ -222,8 +275,18 @@ export function App() {
 
         <aside className="inspector panel">
           <nav className="tabs">
-            {(["summary", "paths", "entities", "insights", "explain"] as Tab[]).map((item) => (
-              <button key={item} className={tab === item ? "is-active" : ""} onClick={() => setTab(item)}>{item}</button>
+            {tabs.map((item) => (
+              <button
+                key={item}
+                className={tab === item ? "is-active" : ""}
+                onClick={() => {
+                  if (item === "trace") setShowTrace(true);
+                  setSelectedTraceNodeId(null);
+                  setTab(item);
+                }}
+              >
+                {item}
+              </button>
             ))}
           </nav>
           <div className="inspector__body">
@@ -289,6 +352,62 @@ export function App() {
                 <h3>Actions</h3>
                 <div className="token-list">{result.analysis.actions.map((action) => <code key={action}>{action}</code>)}</div>
               </>
+            ) : tab === "trace" && trace ? (
+              <div className="trace-inspector">
+                <div className="trace-overview">
+                  <div><span>Started</span><strong>{formatTraceTime(trace.startedAt)}</strong></div>
+                  <div><span>Finished</span><strong>{trace.finishedAt ? formatTraceTime(trace.finishedAt) : "still running / unknown"}</strong></div>
+                  <div><span>Result</span><strong>{trace.notTriggered ? "not triggered" : (trace.scriptExecution || trace.state || "recorded")}</strong></div>
+                  <div><span>Last step</span><strong>{trace.lastStep || "unknown"}</strong></div>
+                </div>
+                {trace.error && <div className="trace-card__error">{trace.error}</div>}
+                <div className="trace-toolbar">
+                  <span>{trace.steps?.length ?? trace.paths.length} runtime event{(trace.steps?.length ?? trace.paths.length) === 1 ? "" : "s"}</span>
+                  <button
+                    className="ghost trace-clear"
+                    onClick={() => {
+                      setSelectedTraceNodeId(null);
+                      setShowTrace(true);
+                    }}
+                  >
+                    Show full run
+                  </button>
+                </div>
+                <div className="trace-step-list">
+                  {(trace.steps?.length ? trace.steps : trace.paths.map((path) => ({ path }))).map((step, index) => {
+                    const nodeId = tracePathToNodeId(step.path, result.graph.nodes.map((node) => node.id));
+                    const node = nodeId ? graphNodeById.get(nodeId) : undefined;
+                    const resultText = formatTraceResult(step.result);
+                    const selected = Boolean(nodeId && selectedTraceNodeId === nodeId);
+                    return (
+                      <button
+                        key={`${step.path}-${step.occurrence ?? index}-${index}`}
+                        className={`trace-step ${selected ? "is-active" : ""} ${nodeId ? "" : "is-unmapped"}`}
+                        onClick={() => {
+                          if (!nodeId) return;
+                          setSelectedPath(null);
+                          setSelectedEntity(null);
+                          setSelectedTraceNodeId(selected ? null : nodeId);
+                          setShowTrace(true);
+                        }}
+                      >
+                        <span className="trace-step__number">{index + 1}</span>
+                        <span className="trace-step__body">
+                          <strong>{node?.label || step.path}</strong>
+                          <code>{step.path}</code>
+                          {(resultText || step.error) && (
+                            <small className={step.error ? "trace-step__error" : ""}>
+                              {step.error || resultText}
+                            </small>
+                          )}
+                        </span>
+                        <span className="trace-step__time">{step.timestamp ? new Date(step.timestamp).toLocaleTimeString() : nodeId ? "mapped" : "unmapped"}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="privacy">Trace data comes from Home Assistant's local trace API. HA Lens does not execute the automation.</p>
+              </div>
             ) : tab === "insights" ? (
               <>
                 <div className="section-intro">These are structural observations, not validation errors.</div>
