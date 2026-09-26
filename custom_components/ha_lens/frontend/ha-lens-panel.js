@@ -292,6 +292,14 @@ class HaLensPanel extends HTMLElement {
     }
   }
 
+  _isDirectScriptAction(value) {
+    return (
+      typeof value === "string"
+      && value.startsWith("script.")
+      && !["script.turn_on", "script.turn_off", "script.toggle", "script.reload"].includes(value)
+    );
+  }
+
   _collectEntityIds(value, output = new Set()) {
     if (typeof value === "string") {
       for (const match of value.matchAll(/\b(?:states|is_state|is_state_attr|state_attr|has_value|expand)\(\s*["']([a-z0-9_]+\.[a-z0-9_]+)["']/gi)) {
@@ -325,6 +333,9 @@ class HaLensPanel extends HTMLElement {
           }
         }
         if (key === "scene" && typeof child === "string" && /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(child)) {
+          output.add(child);
+        }
+        if ((key === "action" || key === "service") && this._isDirectScriptAction(child)) {
           output.add(child);
         }
         this._collectEntityIds(child, output);

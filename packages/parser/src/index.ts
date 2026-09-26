@@ -168,6 +168,18 @@ function parseCondition(value: unknown, id: string): ConditionNode {
   };
 }
 
+const SCRIPT_CONTROL_ACTIONS = new Set([
+  "script.turn_on",
+  "script.turn_off",
+  "script.toggle",
+  "script.reload",
+]);
+
+const directScriptEntity = (action: string): string | null =>
+  action.startsWith("script.") && !SCRIPT_CONTROL_ACTIONS.has(action)
+    ? action
+    : null;
+
 const humanizeActionType = (value: string): string =>
   value
     .replaceAll("_", " ")
@@ -314,12 +326,16 @@ function parseSequenceItem(value: unknown, id: string): SequenceItem {
   if (typeof action === "string") {
     const target = asRecord(raw.target);
     const entity = entityText(target.entity_id ?? raw.entity_id);
+    const directScript = directScriptEntity(action);
+    const scriptTarget = action === "script.turn_on" ? entity : directScript;
     return {
       id,
       kind: "service",
       alias,
       action,
-      summary: alias || `${action}${entity ? ` → ${entity}` : ""}`,
+      summary: alias || (scriptTarget
+        ? `Run script → ${scriptTarget}`
+        : `${action}${entity ? ` → ${entity}` : ""}`),
       raw,
     };
   }

@@ -2,6 +2,7 @@ import type { AnalysisResult, AutomationModel, ConditionNode, Insight, SequenceI
 
 const entityHelperPattern = /\b(?:states|is_state|is_state_attr|state_attr|has_value|expand)\(\s*["']([a-z0-9_]+\.[a-z0-9_]+)["']/gi;
 const dottedStatePattern = /\bstates\.([a-z0-9_]+)\.([a-z0-9_]+)\b/gi;
+const scriptControlActions = new Set(["script.turn_on", "script.turn_off", "script.toggle", "script.reload"]);
 
 function collectTemplateEntities(value: unknown, output: Set<string>) {
   if (typeof value === "string") {
@@ -20,6 +21,14 @@ function collectTemplateEntities(value: unknown, output: Set<string>) {
         values.filter((item): item is string => typeof item === "string").forEach((item) => output.add(item));
       }
       if (key === "scene" && typeof child === "string" && /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(child)) {
+        output.add(child);
+      }
+      if (
+        (key === "action" || key === "service")
+        && typeof child === "string"
+        && child.startsWith("script.")
+        && !scriptControlActions.has(child)
+      ) {
         output.add(child);
       }
       collectTemplateEntities(child, output);

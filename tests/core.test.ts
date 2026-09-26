@@ -270,6 +270,52 @@ actions:
     expect(analysis.entities).toEqual(expect.arrayContaining(["scene.flur_morgens", "scene.flur_abends"]));
   });
 
+
+  it("renders direct and targeted script calls as script runs", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Script calls
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+    to: "on"
+actions:
+  - action: script.good_night
+    data:
+      source: hallway
+  - action: script.turn_on
+    target:
+      entity_id: script.welcome_home
+    data:
+      variables:
+        greeting: hello
+`);
+
+    const direct = automation.actions[0];
+    const targeted = automation.actions[1];
+    expect(direct.kind).toBe("service");
+    expect(targeted.kind).toBe("service");
+    if (direct.kind !== "service" || targeted.kind !== "service") {
+      throw new Error("Expected service actions");
+    }
+
+    expect(direct.action).toBe("script.good_night");
+    expect(direct.summary).toBe("Run script → script.good_night");
+    expect(targeted.action).toBe("script.turn_on");
+    expect(targeted.summary).toBe("Run script → script.welcome_home");
+
+    const graph = buildAutomationGraph(automation);
+    expect(graph.nodes.some((node) => node.label === "Run script → script.good_night")).toBe(true);
+    expect(graph.nodes.some((node) => node.label === "Run script → script.welcome_home")).toBe(true);
+
+    const analysis = analyzeAutomation(automation);
+    expect(analysis.entities).toEqual(expect.arrayContaining([
+      "script.good_night",
+      "script.welcome_home",
+    ]));
+    expect(analysis.entityUsages["script.good_night"]).toEqual([direct.id]);
+    expect(analysis.entityUsages["script.welcome_home"]).toEqual([targeted.id]);
+  });
+
   it("parses Home Assistant device actions as supported actions", () => {
     const { automation } = parseAutomationYaml(`
 alias: Lock door
