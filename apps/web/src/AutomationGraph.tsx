@@ -38,7 +38,9 @@ export function AutomationGraph({
   useEffect(() => {
     if (!flow || !nodes.length) return;
 
-    const frame = window.requestAnimationFrame(() => {
+    // React Flow updates its viewport dimensions through ResizeObserver.
+    // Wait briefly so fitView sees the new canvas width after panels are shown/hidden.
+    const timer = window.setTimeout(() => {
       void flow.fitView({
         nodes,
         padding: 0.18,
@@ -46,9 +48,9 @@ export function AutomationGraph({
         minZoom: 0.2,
         maxZoom: 1.35,
       });
-    });
+    }, 120);
 
-    return () => window.cancelAnimationFrame(frame);
+    return () => window.clearTimeout(timer);
   }, [flow, focusNodeIds, nodes, refitKey]);
 
   const displayNodes = useMemo(
