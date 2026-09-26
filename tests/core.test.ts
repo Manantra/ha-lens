@@ -128,7 +128,7 @@ actions: []
     expect(automation.conditions[0].summary).toContain("mon");
   });
 
-  it("uses choose conditions as branch labels when aliases are missing", () => {
+  it("uses compact choose option labels when aliases are missing", () => {
     const { automation } = parseAutomationYaml(`
 alias: Choose labels
 triggers:
@@ -144,9 +144,21 @@ actions:
           - action: light.turn_on
             target:
               entity_id: light.hall
+      - alias: Guests
+        conditions:
+          - condition: state
+            entity_id: input_boolean.party_mode
+            state: "on"
+        sequence:
+          - action: light.turn_off
+            target:
+              entity_id: light.hall
 `);
     const graph = buildAutomationGraph(automation);
-    expect(graph.edges.some((edge) => edge.label?.includes("input_boolean.guest_mode"))).toBe(true);
+    expect(graph.edges.some((edge) => edge.label === "Option 1")).toBe(true);
+    expect(graph.edges.some((edge) => edge.label === "Guests")).toBe(true);
+    expect(graph.edges.some((edge) => edge.label === "No match")).toBe(true);
+    expect(graph.edges.some((edge) => edge.label?.includes("input_boolean.guest_mode"))).toBe(false);
   });
 
 

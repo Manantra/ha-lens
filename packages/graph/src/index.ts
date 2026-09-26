@@ -60,13 +60,12 @@ class Builder {
         this.connect(incoming, item.id);
         const branchOut: Incoming[] = [];
         item.choices.forEach((choice, index) => {
-          const conditionLabel = choice.conditions.map((condition) => condition.summary).join(" · ");
-          const label = choice.alias || conditionLabel || `option ${index + 1}`;
+          const label = choice.alias || `Option ${index + 1}`;
           if (choice.sequence.length) branchOut.push(...this.buildSequence(choice.sequence, [{ id: item.id, label }]));
           else branchOut.push({ id: item.id, label });
         });
-        if (item.default.length) branchOut.push(...this.buildSequence(item.default, [{ id: item.id, label: "default" }]));
-        else branchOut.push({ id: item.id, label: "no match" });
+        if (item.default.length) branchOut.push(...this.buildSequence(item.default, [{ id: item.id, label: "Default" }]));
+        else branchOut.push({ id: item.id, label: "No match" });
         const merge = this.virtual("merge", "Continue");
         this.connect(branchOut, merge);
         incoming = [{ id: merge }];
