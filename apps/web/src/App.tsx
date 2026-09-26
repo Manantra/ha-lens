@@ -283,7 +283,7 @@ export function App() {
             <button onClick={() => setPresentation(false)}>Exit presentation</button>
           </div>
         </header>
-        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} focusNodeIds={entityFocusNodeIds} /></div>
+        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} focusNodeIds={entityFocusNodeIds} refitKey={yamlCollapsed} /></div>
       </main>
     );
   }

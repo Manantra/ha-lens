@@ -11,11 +11,13 @@ export function AutomationGraph({
   highlightedNodeIds,
   traceNodeIds,
   focusNodeIds,
+  refitKey,
 }: {
   graph: AutomationGraphModel;
   highlightedNodeIds: Set<string>;
   traceNodeIds: Set<string>;
   focusNodeIds?: Set<string>;
+  refitKey?: boolean;
 }) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
@@ -47,7 +49,7 @@ export function AutomationGraph({
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [flow, focusNodeIds, nodes]);
+  }, [flow, focusNodeIds, nodes, refitKey]);
 
   const displayNodes = useMemo(
     () => nodes.map((node) => ({
