@@ -1,36 +1,40 @@
 # HA Lens Home Assistant companion
 
-The first companion release is intentionally read-only.
+The HA Lens companion is intentionally read-only.
 
 ## What it does
 
 - Adds **HA Lens** to the Home Assistant sidebar.
-- Lists loaded `automation.*` entities.
-- Lists actual automation objects loaded by Home Assistant through one admin-only, read-only HA Lens WebSocket command and includes their existing raw configuration in that response.
-- Shows a small diagnostic count for readable automations and entries hidden because Home Assistant exposes no usable raw configuration.
+- Lists actual loaded automation objects through an admin-only, read-only HA Lens WebSocket command.
+- Includes each automation's existing raw configuration when Home Assistant exposes it.
+- Shows a diagnostic count for readable automations and entries hidden because no usable raw configuration is available.
 - Supports filtering the automation picker by alias or entity ID.
-- Loads the latest Home Assistant trace when available and passes a compact, read-only trace summary to the viewer so executed graph nodes can be highlighted.
+- Loads friendly names, areas, devices, and icon identifiers for referenced entities from Home Assistant's local registries.
+- Loads the latest Home Assistant automation trace when available.
 - Provides a dedicated Trace inspector with chronological runtime events, result/choice/condition details, errors, and graph-node mapping.
-- Passes only the selected automation configuration plus metadata for referenced entities to the HA Lens viewer in the browser.
+- Highlights mapped nodes from the latest run in the graph.
+- Lets the YAML panel be collapsed for more graph space.
+- Provides **Fit all** and **Fit width** graph viewport modes.
+- Passes only the selected automation configuration, referenced-entity metadata, and compact trace data to the bundled viewer.
 - Does not register any write action and does not modify automation YAML.
 
-The panel requires an administrator. HA Lens only exposes read-only commands that list loaded automations and return their existing `raw_config`; it does not register any command that can modify an automation.
+The panel requires an administrator. HA Lens exposes only read-only commands for loaded automation data; it does not register a command that can modify an automation.
 
-## Preview architecture
+## Architecture
 
 ```text
 Home Assistant
   └─ HA Lens custom panel
-       ├─ hass.states -> automation selector
-       ├─ hass.connection -> automation/config
-       ├─ area/device/entity registries -> referenced entity metadata
-       └─ postMessage(config + metadata)
+       ├─ loaded automation raw_config
+       ├─ area/device/entity registries
+       ├─ local automation trace API
+       └─ postMessage(config + metadata + compact trace)
              ↓
        Bundled HA Lens viewer
        /ha_lens_static/app/index.html
 ```
 
-The companion ships the compiled visualizer inside `custom_components/ha_lens/frontend/app` and Home Assistant serves it from `/ha_lens_static/app/`. The automation configuration is transferred between two same-origin browser frames with `window.postMessage`; HA Lens has no backend that receives the YAML.
+The companion ships the compiled visualizer inside `custom_components/ha_lens/frontend/app` and Home Assistant serves it from `/ha_lens_static/app/`. Data is transferred between same-origin browser frames with `window.postMessage`; HA Lens has no external backend that receives the YAML or trace.
 
 The companion therefore works without GitHub Pages and does not need internet access after HACS has installed the integration. GitHub Pages remains available only for the standalone public demo.
 
@@ -47,7 +51,6 @@ Until HA Lens is published in a default HACS catalog:
 ## Deliberate limitations
 
 - Read-only.
-- Admin-only panel in this preview.
-- Friendly names, area names, device names, and icon identifiers are shown for referenced entities when Home Assistant provides them.
-- Full MDI icon rendering inside the standalone iframe is not implemented yet.
-- No trace overlay yet.
+- Admin-only panel.
+- Exact MDI icon rendering inside the isolated viewer is not implemented yet; HA Lens uses offline domain-aware fallback glyphs.
+- Trace-to-graph mapping is currently best-effort for deeply nested control flow; richer nested mapping and branch coverage are the next trace-focused work.
