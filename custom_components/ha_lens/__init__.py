@@ -44,14 +44,20 @@ def websocket_automations(
             if state is not None
             else None
         )
+        raw_config = automation.raw_config
+        automation_name = (
+            raw_config.get("alias")
+            if isinstance(raw_config, dict)
+            else None
+        )
 
         automations.append(
             {
                 "entity_id": entity_id,
-                "name": friendly_name or automation.name or entity_id,
+                "name": automation_name or friendly_name or automation.name or entity_id,
                 "id": automation.unique_id,
-                "has_config": automation.raw_config is not None,
-                "config": automation.raw_config,
+                "has_config": raw_config is not None,
+                "config": raw_config,
             }
         )
 
