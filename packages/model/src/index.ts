@@ -23,6 +23,14 @@ export interface ServiceActionNode extends BaseNode {
   action: string;
 }
 
+export interface DeviceActionNode extends BaseNode {
+  kind: "device-action";
+  domain: string;
+  actionType: string;
+  deviceId?: string;
+  entityId?: string;
+}
+
 export interface IfActionNode extends BaseNode {
   kind: "if";
   conditions: ConditionNode[];
@@ -84,6 +92,7 @@ export interface UnknownActionNode extends BaseNode {
 
 export type SequenceItem =
   | ServiceActionNode
+  | DeviceActionNode
   | IfActionNode
   | ChooseActionNode
   | DelayActionNode

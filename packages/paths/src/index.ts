@@ -30,6 +30,12 @@ function expandSequence(items: SequenceItem[], input: PathState[], maxPaths: num
 
       if (item.kind === "service") {
         next.push(cloneWith(state, { nodeId: item.id, label: item.summary, detail: item.action }));
+      } else if (item.kind === "device-action") {
+        next.push(cloneWith(state, {
+          nodeId: item.id,
+          label: item.summary,
+          detail: `${item.domain}.${item.actionType}`,
+        }));
       } else if (item.kind === "stop") {
         const stopped = cloneWith(state, { nodeId: item.id, label: item.summary });
         next.push({ ...stopped, terminal: true, outcome: "stopped" });

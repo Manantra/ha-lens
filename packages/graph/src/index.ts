@@ -41,6 +41,15 @@ class Builder {
         this.node({ id: item.id, kind: "action", label: item.summary, subtitle: item.action });
         this.connect(incoming, item.id);
         incoming = [{ id: item.id }];
+      } else if (item.kind === "device-action") {
+        this.node({
+          id: item.id,
+          kind: "action",
+          label: item.summary,
+          subtitle: `Device action · ${item.domain}`,
+        });
+        this.connect(incoming, item.id);
+        incoming = [{ id: item.id }];
       } else if (item.kind === "inline-condition") {
         this.node({ id: item.id, kind: "condition", label: item.summary });
         this.connect(incoming, item.id);

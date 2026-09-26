@@ -154,6 +154,32 @@ function parseCondition(value: unknown, id: string): ConditionNode {
   };
 }
 
+const humanizeActionType = (value: string): string =>
+  value
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+function parseDeviceAction(raw: UnknownRecord, id: string, alias?: string): SequenceItem | null {
+  const domain = typeof raw.domain === "string" ? raw.domain : "";
+  const actionType = typeof raw.type === "string" ? raw.type : "";
+  const deviceId = typeof raw.device_id === "string" ? raw.device_id : undefined;
+  const entityId = typeof raw.entity_id === "string" ? raw.entity_id : undefined;
+
+  if (!domain || !actionType || (!deviceId && !entityId)) return null;
+
+  return {
+    id,
+    kind: "device-action",
+    alias,
+    domain,
+    actionType,
+    deviceId,
+    entityId,
+    summary: alias || humanizeActionType(actionType),
+    raw,
+  };
+}
+
 function parseSequence(value: unknown, prefix: string): SequenceItem[] {
   return asList(value).map((item, index) => parseSequenceItem(item, `${prefix}.${index}`));
 }
@@ -255,6 +281,9 @@ function parseSequenceItem(value: unknown, id: string): SequenceItem {
     const condition = parseCondition(raw, `${id}.condition`);
     return { id, kind: "inline-condition", alias, summary: condition.summary, raw, condition };
   }
+
+  const deviceAction = parseDeviceAction(raw, id, alias);
+  if (deviceAction) return deviceAction;
 
   const action = raw.action ?? raw.service;
   if (typeof action === "string") {

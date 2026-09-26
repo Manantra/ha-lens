@@ -219,6 +219,43 @@ actions:
     expect(analysis.entityUsages["light.hall"]).toEqual(["actions.0.choose.0.sequence.0"]);
   });
 
+
+  it("parses Home Assistant device actions as supported actions", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Lock door
+triggers:
+  - trigger: numeric_state
+    entity_id: zone.home
+    below: 1
+actions:
+  - device_id: 848332cb3e1e578fd22c2233e
+    domain: lock
+    entity_id: 147d91f90416f5849d4affeb6
+    type: lock
+`);
+
+    const item = automation.actions[0];
+    expect(item.kind).toBe("device-action");
+    if (item.kind !== "device-action") throw new Error("Expected device action");
+    expect(item.domain).toBe("lock");
+    expect(item.actionType).toBe("lock");
+    expect(item.summary).toBe("Lock");
+
+    const graph = buildAutomationGraph(automation);
+    const actionNode = graph.nodes.find((node) => node.id === item.id);
+    expect(actionNode?.kind).toBe("action");
+    expect(actionNode?.label).toBe("Lock");
+    expect(actionNode?.subtitle).toBe("Device action · lock");
+    expect(graph.nodes.some((node) => node.kind === "unknown")).toBe(false);
+
+    const analysis = analyzeAutomation(automation);
+    expect(analysis.actions).toContain("lock.lock [device]");
+    expect(analysis.entityUsages["147d91f90416f5849d4affeb6"]).toEqual([item.id]);
+
+    const paths = enumerateExecutionPaths(automation);
+    expect(paths.some((path) => path.steps.some((step) => step.label === "Lock" && step.detail === "lock.lock"))).toBe(true);
+  });
+
   it("exports graph structure as Mermaid", () => {
     const { automation } = parseAutomationYaml(yaml);
     const graph = buildAutomationGraph(automation);

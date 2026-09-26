@@ -12,6 +12,7 @@ import { sampleAutomation } from "./sample";
 type Tab = "summary" | "paths" | "entities" | "trace" | "insights" | "explain";
 
 interface CompanionEntityMetadata {
+  entityId?: string | null;
   name?: string | null;
   icon?: string | null;
   area?: string | null;
@@ -236,8 +237,8 @@ export function App() {
     const nodeIds = result.analysis.entityUsages[selectedEntity] ?? [];
     const details = result.analysis.entityUsageDetails[selectedEntity] ?? [];
     return {
-      entityId: selectedEntity,
-      name: metadata?.name && metadata.name !== selectedEntity ? metadata.name : selectedEntity,
+      entityId: metadata?.entityId || selectedEntity,
+      name: metadata?.name && metadata.name !== selectedEntity ? metadata.name : (metadata?.entityId || selectedEntity),
       nodeCount: nodeIds.length,
       referenceCount: details.length,
       details,
@@ -425,12 +426,12 @@ export function App() {
                           setSelectedEntity(focused ? null : entity);
                         }}
                       >
-                        <EntityIcon entityId={entity} icon={metadata?.icon} />
+                        <EntityIcon entityId={metadata?.entityId || entity} icon={metadata?.icon} />
                         <span className="entity-card__main">
                           <span className="entity-card__title-row">
                             <strong>{displayName}</strong>
                           </span>
-                          <code>{entity}</code>
+                          <code>{metadata?.entityId || entity}</code>
                           {(focused || metadata?.area || metadata?.device) && (
                             <span className="entity-card__meta">
                               {focused && <small className="entity-card__focused-badge">Focused</small>}

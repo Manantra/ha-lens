@@ -311,7 +311,13 @@ class HaLensPanel extends HTMLElement {
         if (key === "entity_id") {
           const values = Array.isArray(child) ? child : [child];
           for (const entityId of values) {
-            if (typeof entityId === "string" && /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(entityId)) {
+            if (
+              typeof entityId === "string"
+              && (
+                /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(entityId)
+                || /^[a-f0-9]{20,}$/i.test(entityId)
+              )
+            ) {
               output.add(entityId);
             }
           }
@@ -407,17 +413,24 @@ class HaLensPanel extends HTMLElement {
     const areasById = new Map(areas.map((area) => [area.area_id, area]));
     const devicesById = new Map(devices.map((device) => [device.id, device]));
     const entitiesById = new Map(entities.map((entity) => [entity.entity_id, entity]));
+    const entitiesByRegistryId = new Map(
+      entities
+        .filter((entity) => typeof entity.id === "string" && entity.id)
+        .map((entity) => [entity.id, entity])
+    );
     const metadata = {};
 
     for (const entityId of entityIds) {
-      const state = this._hass?.states?.[entityId];
-      const registry = entitiesById.get(entityId);
+      const registry = entitiesById.get(entityId) || entitiesByRegistryId.get(entityId);
+      const resolvedEntityId = registry?.entity_id || (/^[a-z0-9_]+\.[a-z0-9_]+$/i.test(entityId) ? entityId : null);
+      const state = resolvedEntityId ? this._hass?.states?.[resolvedEntityId] : null;
       const device = registry?.device_id ? devicesById.get(registry.device_id) : null;
       const areaId = registry?.area_id || device?.area_id;
       const area = areaId ? areasById.get(areaId) : null;
 
       metadata[entityId] = {
-        name: registry?.name || state?.attributes?.friendly_name || registry?.original_name || entityId,
+        entityId: resolvedEntityId,
+        name: registry?.name || state?.attributes?.friendly_name || registry?.original_name || resolvedEntityId || entityId,
         icon: registry?.icon || state?.attributes?.icon || null,
         area: area?.name || null,
         device: device?.name_by_user || device?.name || null,

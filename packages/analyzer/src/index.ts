@@ -51,6 +51,7 @@ function inspectSequence(items: SequenceItem[], depth = 1): {
     actions += 1;
     maxDepth = Math.max(maxDepth, depth);
     if (item.kind === "service") calls.push(item.action);
+    if (item.kind === "device-action") calls.push(`${item.domain}.${item.actionType} [device]`);
     if (item.kind === "unknown") insights.push({ level: "warning", nodeId: item.id, message: "Unsupported syntax is kept visible as an unknown node." });
     if (item.kind === "wait" && item.timeout == null) insights.push({ level: "info", nodeId: item.id, message: "This wait has no timeout and may pause indefinitely." });
     if (item.kind === "choose" && item.default.length === 0) insights.push({ level: "info", nodeId: item.id, message: "This choose block has no default. If no option matches, execution continues after it." });
@@ -204,7 +205,9 @@ function recordSequenceUsage(items: SequenceItem[], usage: EntityUsageMap, prefi
   for (const item of items) {
     const itemLabel = item.kind === "service"
       ? (item.alias || `Action · ${item.action}`)
-      : (item.alias || item.summary);
+      : item.kind === "device-action"
+        ? (item.alias || `Device action · ${item.summary}`)
+        : (item.alias || item.summary);
 
     if (item.kind === "if") {
       recordEntityUsage(item.raw, item.id, [...prefix, itemLabel].join(" → "), usage, ["if", "then", "else"]);
@@ -270,6 +273,8 @@ export function explainAutomation(automation: AutomationModel): string[] {
   for (const item of automation.actions) {
     if (item.kind === "service") {
       lines.push(`Then it calls ${item.summary}.`);
+    } else if (item.kind === "device-action") {
+      lines.push(`Then it runs the ${item.summary} device action in the ${item.domain} domain.`);
     } else if (item.kind === "if") {
       const conditionText = item.conditions.map((condition) => condition.summary).join("; ") || "its condition";
       lines.push(`Decision: ${conditionText}. If true: ${summarizeSequence(item.then)}. If false: ${summarizeSequence(item.else)}.`);
