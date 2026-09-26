@@ -374,7 +374,10 @@ export function App() {
                   </button>
                 </div>
                 <div className="trace-step-list">
-                  {(trace.steps?.length ? trace.steps : trace.paths.map((path) => ({ path }))).map((step, index) => {
+                  {(trace.steps?.length
+                    ? trace.steps
+                    : trace.paths.map((path): CompanionTraceStep => ({ path }))
+                  ).map((step, index) => {
                     const nodeId = tracePathToNodeId(step.path, result.graph.nodes.map((node) => node.id));
                     const node = nodeId ? graphNodeById.get(nodeId) : undefined;
                     const resultText = formatTraceResult(step.result);
