@@ -39,7 +39,8 @@
 - [x] friendly names, areas, device metadata and icon identifiers
 - [x] clearer entity metadata cards and friendly-name sorting
 - [x] entity focus banner and nested usage context
-- [x] render offline domain-aware entity icons visually
+- [x] render offline domain-aware entity icon fallbacks visually
+- [ ] render exact Home Assistant / MDI entity icons inside the isolated viewer
 - [x] no write-back in the first companion release
 - [x] search/filter automation picker
 - [x] latest Home Assistant trace highlighting

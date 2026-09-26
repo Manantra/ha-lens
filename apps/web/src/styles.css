@@ -655,3 +655,46 @@ button.ghost { background: transparent; color: #dce3f5; }
     grid-column: 1 / -1;
   }
 }
+
+
+/* v0.1.14 entity focus layout fixes */
+.graph-area.has-entity-focus {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+.graph-canvas {
+  min-height: 0;
+  position: relative;
+}
+.graph-canvas .automation-graph {
+  height: 100%;
+}
+
+.entity-focus-banner {
+  position: relative;
+  z-index: 2;
+  top: auto;
+  left: auto;
+  right: auto;
+  margin: 10px 12px 8px;
+  box-shadow: none;
+}
+
+.entity-card__title-row {
+  display: block;
+}
+.entity-card__title-row > strong {
+  width: 100%;
+  max-width: 100%;
+}
+.entity-card__focused-badge {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 760px) {
+  .graph-area.has-entity-focus {
+    grid-template-rows: auto minmax(420px, 1fr);
+  }
+}

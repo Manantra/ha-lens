@@ -320,7 +320,7 @@ export function App() {
               <span>{result.ok ? `${result.paths.length} paths` : "Waiting for valid YAML"}</span>
             </div>
           </div>
-          <div className="graph-area">
+          <div className={`graph-area ${entityFocus ? "has-entity-focus" : ""}`}>
             {entityFocus && (
               <div className="entity-focus-banner">
                 <div className="entity-focus-banner__icon">◎</div>
@@ -336,7 +336,9 @@ export function App() {
                 <button className="entity-focus-banner__clear" onClick={() => setSelectedEntity(null)}>Clear focus</button>
               </div>
             )}
-            {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
+            <div className="graph-canvas">
+              {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
+            </div>
           </div>
         </section>
 
@@ -419,13 +421,13 @@ export function App() {
                         <span className="entity-card__main">
                           <span className="entity-card__title-row">
                             <strong>{displayName}</strong>
-                            {focused && <small className="entity-card__focused-badge">Focused</small>}
                           </span>
                           <code>{entity}</code>
-                          {(metadata?.area || metadata?.device) && (
+                          {(focused || metadata?.area || metadata?.device) && (
                             <span className="entity-card__meta">
-                              {metadata.area && <small><b>Area</b>{metadata.area}</small>}
-                              {metadata.device && <small><b>Device</b>{metadata.device}</small>}
+                              {focused && <small className="entity-card__focused-badge">Focused</small>}
+                              {metadata?.area && <small><b>Area</b>{metadata.area}</small>}
+                              {metadata?.device && <small><b>Device</b>{metadata.device}</small>}
                             </span>
                           )}
                           {focused && usageDetails.length > 0 && (
@@ -437,7 +439,7 @@ export function App() {
                             </span>
                           )}
                         </span>
-                        <span className="entity-card__usage" title={`Referenced by ${usageCount} visible graph node${usageCount === 1 ? "" : "s"}`}>
+                        <span className="entity-card__usage">
                           <strong>{usageCount}</strong>
                           <small>{usageCount === 1 ? "node" : "nodes"}</small>
                         </span>
