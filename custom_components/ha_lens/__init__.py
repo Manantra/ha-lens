@@ -124,7 +124,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         module_url=f"{STATIC_URL}/ha-lens-panel.js?v={version}",
         require_admin=True,
         config={
-            "viewer_url": VIEWER_URL,
+            "viewer_url": f"{VIEWER_URL}?v={version}",
             "version": version,
         },
         config_panel_domain=DOMAIN,
