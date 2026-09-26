@@ -815,3 +815,10 @@ button.ghost { background: transparent; color: #dce3f5; }
   rx: 6px;
   ry: 6px;
 }
+
+
+/* Stable branch-label spacing */
+.react-flow__edge-text,
+.react-flow__edge-textbg {
+  transform: translateY(-2px);
+}
