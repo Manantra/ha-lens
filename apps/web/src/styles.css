@@ -166,6 +166,8 @@ button.ghost { background: transparent; color: #dce3f5; }
 }
 
 @media (max-width: 760px) {
+  .graph-fit-controls { display: none; }
+
   .topbar {
     display: grid;
     grid-template-columns: 1fr;
@@ -290,6 +292,9 @@ button.ghost { background: transparent; color: #dce3f5; }
 
 
 .panel__header-actions { display: flex; align-items: center; gap: 9px; }
+.graph-fit-controls { display: flex; align-items: center; gap: 4px; }
+.fit-toggle { border: 1px solid #354057; background: #171d29; color: #95a4bf; border-radius: 999px; padding: 4px 8px; font-size: 10px; font-weight: 800; }
+.fit-toggle.is-active { border-color: #617bd0; color: #d7e1ff; background: #202a43; }
 .trace-toggle { border: 1px solid #354057; background: #171d29; color: #95a4bf; border-radius: 999px; padding: 4px 9px; font-size: 10px; font-weight: 800; }
 .trace-toggle.is-active { border-color: #4fb67a; color: #b8f3cf; background: #173123; }
 .trace-card { margin: 12px 0 16px; padding: 12px; border: 1px solid #315943; border-radius: 12px; background: #122019; display: flex; flex-direction: column; gap: 8px; }

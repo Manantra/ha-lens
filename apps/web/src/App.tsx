@@ -10,6 +10,7 @@ import { AutomationGraph } from "./AutomationGraph";
 import { sampleAutomation } from "./sample";
 
 type Tab = "summary" | "paths" | "entities" | "trace" | "insights" | "explain";
+type GraphFitMode = "all" | "width";
 
 interface CompanionEntityMetadata {
   entityId?: string | null;
@@ -133,6 +134,7 @@ export function App() {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [presentation, setPresentation] = useState(false);
   const [yamlCollapsed, setYamlCollapsed] = useState(false);
+  const [graphFitMode, setGraphFitMode] = useState<GraphFitMode>("all");
   const [exporting, setExporting] = useState<GraphExportFormat | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const [entityMetadata, setEntityMetadata] = useState<Record<string, CompanionEntityMetadata>>({});
@@ -283,7 +285,7 @@ export function App() {
             <button onClick={() => setPresentation(false)}>Exit presentation</button>
           </div>
         </header>
-        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} focusNodeIds={entityFocusNodeIds} refitKey={yamlCollapsed} /></div>
+        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} focusNodeIds={entityFocusNodeIds} fitMode={graphFitMode} /></div>
       </main>
     );
   }
@@ -326,6 +328,22 @@ export function App() {
           <div className="panel__header">
             <strong>{result.ok ? result.automation.alias : "Automation map"}</strong>
             <div className="panel__header-actions">
+              <div className="graph-fit-controls" aria-label="Graph fit mode">
+                <button
+                  className={`ghost fit-toggle ${graphFitMode === "all" ? "is-active" : ""}`}
+                  onClick={() => setGraphFitMode("all")}
+                  title="Fit the complete graph into the available canvas"
+                >
+                  Fit all
+                </button>
+                <button
+                  className={`ghost fit-toggle ${graphFitMode === "width" ? "is-active" : ""}`}
+                  onClick={() => setGraphFitMode("width")}
+                  title="Fit graph to the available width; pan vertically for tall automations"
+                >
+                  Fit width
+                </button>
+              </div>
               {yamlCollapsed && (
                 <button
                   className="ghost yaml-toggle"
@@ -367,7 +385,7 @@ export function App() {
               </div>
             )}
             <div className="graph-canvas">
-              {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} focusNodeIds={entityFocusNodeIds} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
+              {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} focusNodeIds={entityFocusNodeIds} refitKey={yamlCollapsed} fitMode={graphFitMode} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
             </div>
           </div>
         </section>

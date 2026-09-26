@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Background, Controls, MiniMap, ReactFlow, type Edge, type Node, type ReactFlowInstance } from "@xyflow/react";
 import type { AutomationGraph as AutomationGraphModel } from "@ha-lens/model";
 import { LensNode } from "./LensNode";
@@ -12,16 +12,19 @@ export function AutomationGraph({
   traceNodeIds,
   focusNodeIds,
   refitKey,
+  fitMode = "all",
 }: {
   graph: AutomationGraphModel;
   highlightedNodeIds: Set<string>;
   traceNodeIds: Set<string>;
   focusNodeIds?: Set<string>;
   refitKey?: boolean;
+  fitMode?: "all" | "width";
 }) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
   const [flow, setFlow] = useState<ReactFlowInstance<Node, Edge> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,8 +42,27 @@ export function AutomationGraph({
     if (!flow || !nodes.length) return;
 
     // React Flow updates its viewport dimensions through ResizeObserver.
-    // Wait briefly so fitView sees the new canvas width after panels are shown/hidden.
+    // Wait briefly so viewport calculations see the settled canvas size.
     const timer = window.setTimeout(() => {
+      if (fitMode === "width") {
+        const container = containerRef.current;
+        if (!container) return;
+
+        const bounds = flow.getNodesBounds(nodes.map((node) => node.id));
+        if (bounds.width <= 0) return;
+
+        const rect = container.getBoundingClientRect();
+        const horizontalPadding = 32;
+        const topPadding = 28;
+        const usableWidth = Math.max(1, rect.width - horizontalPadding * 2);
+        const zoom = Math.min(1.35, Math.max(0.2, usableWidth / bounds.width));
+        const x = (rect.width - bounds.width * zoom) / 2 - bounds.x * zoom;
+        const y = topPadding - bounds.y * zoom;
+
+        void flow.setViewport({ x, y, zoom }, { duration: 260 });
+        return;
+      }
+
       void flow.fitView({
         nodes,
         padding: 0.18,
@@ -51,7 +73,7 @@ export function AutomationGraph({
     }, 120);
 
     return () => window.clearTimeout(timer);
-  }, [flow, focusNodeIds, nodes, refitKey]);
+  }, [fitMode, flow, focusNodeIds, nodes, refitKey]);
 
   const displayNodes = useMemo(
     () => nodes.map((node) => ({
@@ -75,7 +97,7 @@ export function AutomationGraph({
   );
 
   return (
-    <div className="automation-graph" data-export-graph>
+    <div ref={containerRef} className="automation-graph" data-export-graph>
       <ReactFlow
         nodes={displayNodes}
         edges={displayEdges}
