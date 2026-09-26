@@ -1,4 +1,4 @@
-import type { AnalysisResult, AutomationModel, ConditionNode, Insight, SequenceItem, UnknownRecord } from "@ha-lens/model";
+import type { AnalysisResult, AutomationModel, ConditionNode, Insight, SequenceItem, TriggerNode, UnknownRecord } from "@ha-lens/model";
 
 const entityHelperPattern = /\b(?:states|is_state|is_state_attr|state_attr|has_value|expand)\(\s*["']([a-z0-9_]+\.[a-z0-9_]+)["']/gi;
 const dottedStatePattern = /\bstates\.([a-z0-9_]+)\.([a-z0-9_]+)\b/gi;
@@ -138,6 +138,30 @@ function recordEntityUsage(
   }
 }
 
+function readableValue(value: unknown): string | null {
+  if (value == null) return null;
+  if (Array.isArray(value)) return value.map((item) => String(item)).join(" / ");
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  return null;
+}
+
+function triggerUsageContext(trigger: TriggerNode, index: number): string {
+  const prefix = `Trigger ${index + 1}`;
+  if (trigger.alias) return `${prefix} · ${trigger.alias}`;
+
+  if (trigger.triggerType === "state") {
+    const from = readableValue(trigger.raw.from);
+    const to = readableValue(trigger.raw.to);
+    const transition = from && to ? `${from} → ${to}` : to ? `→ ${to}` : from ? `${from} →` : "state change";
+    return `${prefix} · State ${transition}`;
+  }
+
+  const type = trigger.triggerType
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return `${prefix} · ${type || "Trigger"}`;
+}
+
 function conditionLabel(condition: ConditionNode): string {
   if (condition.alias) return condition.alias;
   const labels: Record<string, string> = {
@@ -178,7 +202,9 @@ function recordConditionUsage(
 
 function recordSequenceUsage(items: SequenceItem[], usage: EntityUsageMap, prefix: string[] = []) {
   for (const item of items) {
-    const itemLabel = item.alias || item.summary;
+    const itemLabel = item.kind === "service"
+      ? (item.alias || `Action · ${item.action}`)
+      : (item.alias || item.summary);
 
     if (item.kind === "if") {
       recordEntityUsage(item.raw, item.id, [...prefix, itemLabel].join(" → "), usage, ["if", "then", "else"]);
@@ -281,8 +307,8 @@ export function analyzeAutomation(automation: AutomationModel): AnalysisResult {
   const conditionStats = automation.conditions.map(countCondition);
   const sequenceInfo = inspectSequence(automation.actions);
   const entityUsage = new Map<string, EntityUsageDetail[]>();
-  automation.triggers.forEach((trigger) =>
-    recordEntityUsage(trigger.raw, trigger.id, `Trigger → ${trigger.alias || trigger.summary}`, entityUsage)
+  automation.triggers.forEach((trigger, index) =>
+    recordEntityUsage(trigger.raw, trigger.id, triggerUsageContext(trigger, index), entityUsage)
   );
   automation.conditions.forEach((condition) =>
     recordConditionUsage(condition, condition.id, ["Top-level condition"], entityUsage)

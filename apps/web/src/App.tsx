@@ -191,11 +191,18 @@ export function App() {
     }
   }, [yaml]);
 
+  const entityFocusNodeIds = useMemo(
+    () => selectedEntity && result.ok
+      ? new Set(result.analysis.entityUsages[selectedEntity] ?? [])
+      : new Set<string>(),
+    [result, selectedEntity],
+  );
+
   const highlightedNodeIds = useMemo(() => {
     if (selectedTraceNodeId) return new Set([selectedTraceNodeId]);
-    if (selectedEntity && result.ok) return new Set(result.analysis.entityUsages[selectedEntity] ?? []);
+    if (entityFocusNodeIds.size) return entityFocusNodeIds;
     return new Set(selectedPath?.steps.map((step) => step.nodeId) ?? []);
-  }, [result, selectedEntity, selectedPath, selectedTraceNodeId]);
+  }, [entityFocusNodeIds, selectedPath, selectedTraceNodeId]);
 
   const tracedNodeIds = useMemo(
     () => result.ok && trace && showTrace ? traceNodeIds(trace.paths, result.graph.nodes.map((node) => node.id)) : new Set<string>(),
@@ -274,7 +281,7 @@ export function App() {
             <button onClick={() => setPresentation(false)}>Exit presentation</button>
           </div>
         </header>
-        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} /></div>
+        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} focusNodeIds={entityFocusNodeIds} /></div>
       </main>
     );
   }
@@ -337,7 +344,7 @@ export function App() {
               </div>
             )}
             <div className="graph-canvas">
-              {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
+              {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} focusNodeIds={entityFocusNodeIds} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
             </div>
           </div>
         </section>

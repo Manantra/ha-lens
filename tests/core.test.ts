@@ -150,6 +150,29 @@ actions:
   });
 
 
+
+  it("uses concise human-readable trigger contexts for entity focus", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Trigger usage
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+    from: "off"
+    to: "on"
+  - trigger: state
+    entity_id: binary_sensor.motion
+    from: "on"
+    to: "off"
+actions: []
+`);
+    const analysis = analyzeAutomation(automation);
+
+    expect(analysis.entityUsageDetails["binary_sensor.motion"]).toEqual([
+      { nodeId: "triggers.0", context: "Trigger 1 · State off → on" },
+      { nodeId: "triggers.1", context: "Trigger 2 · State on → off" },
+    ]);
+  });
+
   it("maps nested entity references to visible graph nodes with readable contexts", () => {
     const { automation } = parseAutomationYaml(`
 alias: Nested usage
