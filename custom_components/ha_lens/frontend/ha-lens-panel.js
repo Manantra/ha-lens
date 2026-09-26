@@ -12,6 +12,7 @@ class HaLensPanel extends HTMLElement {
     this._automationItems = [];
     this._automationListPromise = null;
     this._diagnosticsText = "";
+    this._filterQuery = "";
     this._targetOrigin = window.location.origin;
     this._onWindowMessage = this._onWindowMessage.bind(this);
   }
@@ -97,6 +98,7 @@ class HaLensPanel extends HTMLElement {
           color: #7c9cff;
         }
 
+        .automation-search,
         select {
           flex: 1;
           min-width: 180px;
@@ -108,6 +110,10 @@ class HaLensPanel extends HTMLElement {
           color: #e9eefc;
           background: #181d27;
           font: inherit;
+        }
+
+        .automation-search {
+          max-width: 240px;
         }
 
         .status {
@@ -154,6 +160,7 @@ class HaLensPanel extends HTMLElement {
       <div class="shell">
         <div class="toolbar">
           <div class="brand"><span>◉</span> HA Lens</div>
+          <input class="automation-search" type="search" placeholder="Filter automations…" aria-label="Filter automations" />
           <select aria-label="Home Assistant automation">
             <option value="">Select an automation…</option>
           </select>
@@ -163,9 +170,15 @@ class HaLensPanel extends HTMLElement {
       </div>
     `;
 
+    this._search = this.shadowRoot.querySelector(".automation-search");
     this._select = this.shadowRoot.querySelector("select");
     this._status = this.shadowRoot.querySelector(".status");
     this._frame = this.shadowRoot.querySelector("iframe");
+
+    this._search.addEventListener("input", () => {
+      this._filterQuery = this._search.value.trim().toLocaleLowerCase();
+      this._syncAutomations();
+    });
 
     this._select.addEventListener("change", () => {
       this._selected = this._select.value;
@@ -246,21 +259,32 @@ class HaLensPanel extends HTMLElement {
     if (!this._select) return;
     const automations = this._automations();
     const previous = this._selected || this._select.value;
+    const query = this._filterQuery;
+    const visible = query
+      ? automations.filter((automation) =>
+          automation.name.toLocaleLowerCase().includes(query)
+          || automation.entityId.toLocaleLowerCase().includes(query)
+        )
+      : automations;
 
     this._select.replaceChildren();
     const placeholder = document.createElement("option");
     placeholder.value = "";
-    placeholder.textContent = automations.length ? "Select an automation…" : "No automations found";
+    placeholder.textContent = !automations.length
+      ? "No automations found"
+      : visible.length
+        ? "Select an automation…"
+        : "No matching automations";
     this._select.append(placeholder);
 
-    for (const automation of automations) {
+    for (const automation of visible) {
       const option = document.createElement("option");
       option.value = automation.entityId;
       option.textContent = automation.name;
       this._select.append(option);
     }
 
-    if (automations.some((automation) => automation.entityId === previous)) {
+    if (visible.some((automation) => automation.entityId === previous)) {
       this._select.value = previous;
       this._selected = previous;
     }
@@ -318,6 +342,47 @@ class HaLensPanel extends HTMLElement {
     return this._registryPromise;
   }
 
+  async _latestTrace(automation) {
+    if (!automation?.automationId || !this._hass?.callWS) return null;
+
+    try {
+      const itemId = String(automation.automationId);
+      const traces = await this._hass.callWS({
+        type: "trace/list",
+        domain: "automation",
+        item_id: itemId,
+      });
+      if (!Array.isArray(traces) || !traces.length) return null;
+
+      const latest = [...traces].sort((left, right) =>
+        String(right?.timestamp?.start || "").localeCompare(String(left?.timestamp?.start || ""))
+      )[0];
+      if (!latest?.run_id) return null;
+
+      const extended = await this._hass.callWS({
+        type: "trace/get",
+        domain: "automation",
+        item_id: itemId,
+        run_id: latest.run_id,
+      });
+
+      return {
+        runId: extended?.run_id || latest.run_id,
+        state: extended?.state || latest?.state || null,
+        scriptExecution: extended?.script_execution ?? latest?.script_execution ?? null,
+        startedAt: extended?.timestamp?.start || latest?.timestamp?.start || null,
+        finishedAt: extended?.timestamp?.finish || latest?.timestamp?.finish || null,
+        lastStep: extended?.last_step ?? latest?.last_step ?? null,
+        error: extended?.error || latest?.error || null,
+        notTriggered: Boolean(extended?.not_triggered ?? latest?.not_triggered),
+        paths: Object.keys(extended?.trace || {}),
+      };
+    } catch (error) {
+      console.warn("HA Lens could not load the latest automation trace", error);
+      return null;
+    }
+  }
+
   async _entityMetadata(config) {
     const entityIds = this._collectEntityIds(config);
     const { areas, devices, entities } = await this._registryData();
@@ -361,7 +426,10 @@ class HaLensPanel extends HTMLElement {
         throw new Error(`No loaded config for ${entityId}. Refresh HA Lens after Home Assistant reloads automations.`);
       }
 
-      const entityMetadata = await this._entityMetadata(config);
+      const [entityMetadata, trace] = await Promise.all([
+        this._entityMetadata(config),
+        this._latestTrace(selected),
+      ]);
 
       this._pendingMessage = {
         type: "ha-lens:automation",
@@ -369,6 +437,7 @@ class HaLensPanel extends HTMLElement {
         entityId,
         config,
         entityMetadata,
+        trace,
       };
 
       this._sendPending();

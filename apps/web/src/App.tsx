@@ -18,6 +18,49 @@ interface CompanionEntityMetadata {
   device?: string | null;
 }
 
+interface CompanionTrace {
+  runId: string;
+  state?: string | null;
+  scriptExecution?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  lastStep?: string | null;
+  error?: string | null;
+  notTriggered?: boolean;
+  paths: string[];
+}
+
+function traceNodeIds(paths: string[], nodeIds: string[]): Set<string> {
+  const available = new Set(nodeIds);
+  const output = new Set<string>();
+
+  for (const path of paths) {
+    const parts = path.split("/").filter(Boolean);
+    if (!parts.length) continue;
+    if (parts[0] === "trigger") parts[0] = "triggers";
+    else if (parts[0] === "condition") parts[0] = "conditions";
+    else if (parts[0] === "action") parts[0] = "actions";
+    else continue;
+
+    while (parts.length) {
+      const candidate = parts.join(".");
+      if (available.has(candidate)) {
+        output.add(candidate);
+        break;
+      }
+      parts.pop();
+    }
+  }
+
+  return output;
+}
+
+function formatTraceTime(value?: string | null): string {
+  if (!value) return "unknown time";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
+
 export function App() {
   const [yaml, setYaml] = useState(sampleAutomation);
   const [tab, setTab] = useState<Tab>("summary");
@@ -27,6 +70,8 @@ export function App() {
   const [exporting, setExporting] = useState<GraphExportFormat | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const [entityMetadata, setEntityMetadata] = useState<Record<string, CompanionEntityMetadata>>({});
+  const [trace, setTrace] = useState<CompanionTrace | null>(null);
+  const [showTrace, setShowTrace] = useState(false);
   const embedded = useMemo(() => new URLSearchParams(window.location.search).get("embedded") === "1", []);
 
   useEffect(() => {
@@ -48,11 +93,14 @@ export function App() {
         type?: string;
         config?: unknown;
         entityMetadata?: Record<string, CompanionEntityMetadata>;
+        trace?: CompanionTrace | null;
       };
       if (message.type !== "ha-lens:automation" || !message.config || typeof message.config !== "object") return;
 
       setYaml(serializeAutomationYaml(message.config));
       setEntityMetadata(message.entityMetadata && typeof message.entityMetadata === "object" ? message.entityMetadata : {});
+      setTrace(message.trace && typeof message.trace === "object" ? message.trace : null);
+      setShowTrace(Boolean(message.trace));
       setSelectedPath(null);
       setSelectedEntity(null);
       setTab("summary");
@@ -81,6 +129,11 @@ export function App() {
     if (selectedEntity && result.ok) return new Set(result.analysis.entityUsages[selectedEntity] ?? []);
     return new Set(selectedPath?.steps.map((step) => step.nodeId) ?? []);
   }, [result, selectedEntity, selectedPath]);
+
+  const tracedNodeIds = useMemo(
+    () => result.ok && trace && showTrace ? traceNodeIds(trace.paths, result.graph.nodes.map((node) => node.id)) : new Set<string>(),
+    [result, showTrace, trace],
+  );
 
   async function copyMermaid() {
     if (!result.ok) return;
@@ -119,7 +172,7 @@ export function App() {
             <button onClick={() => setPresentation(false)}>Exit presentation</button>
           </div>
         </header>
-        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} /></div>
+        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} /></div>
       </main>
     );
   }
@@ -132,7 +185,7 @@ export function App() {
           <div className="tagline">See what your Home Assistant automation can do.</div>
         </div>
         <div className="topbar__actions">
-          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setEntityMetadata({}); }}>Load example</button>
+          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setEntityMetadata({}); setTrace(null); setShowTrace(false); }}>Load example</button>
           <button className="ghost" disabled={!result.ok} onClick={() => void copyMermaid()}>{copyStatus === "copied" ? "Mermaid copied ✓" : copyStatus === "failed" ? "Copy failed" : "Copy Mermaid"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("svg")}>{exporting === "svg" ? "Exporting…" : "Export SVG"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
@@ -143,16 +196,27 @@ export function App() {
       <section className="workspace">
         <aside className="yaml-panel panel">
           <div className="panel__header"><strong>Automation YAML</strong><span>local only</span></div>
-          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
+          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setTrace(null); setShowTrace(false); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
         </aside>
 
         <section className="graph-panel panel">
           <div className="panel__header">
             <strong>{result.ok ? result.automation.alias : "Automation map"}</strong>
-            <span>{result.ok ? `${result.paths.length} paths` : "Waiting for valid YAML"}</span>
+            <div className="panel__header-actions">
+              {trace && result.ok && (
+                <button
+                  className={`trace-toggle ${showTrace ? "is-active" : ""}`}
+                  onClick={() => setShowTrace((value) => !value)}
+                  title="Highlight nodes touched by the latest Home Assistant trace"
+                >
+                  Last run
+                </button>
+              )}
+              <span>{result.ok ? `${result.paths.length} paths` : "Waiting for valid YAML"}</span>
+            </div>
           </div>
           <div className="graph-area">
-            {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
+            {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
           </div>
         </section>
 
@@ -167,6 +231,19 @@ export function App() {
               <>
                 <h2>{result.automation.alias}</h2>
                 {result.automation.description && <p className="muted">{result.automation.description}</p>}
+                {trace && (
+                  <div className="trace-card">
+                    <div>
+                      <strong>Last Home Assistant run</strong>
+                      <span>{formatTraceTime(trace.startedAt)}</span>
+                    </div>
+                    <div className="trace-card__meta">
+                      <span>{trace.notTriggered ? "not triggered" : (trace.scriptExecution || trace.state || "recorded")}</span>
+                      <span>{trace.paths.length} traced step{trace.paths.length === 1 ? "" : "s"}</span>
+                    </div>
+                    {trace.error && <div className="trace-card__error">{trace.error}</div>}
+                  </div>
+                )}
                 <div className="stat-grid">
                   {Object.entries(result.analysis.stats).map(([key, value]) => <div className="stat" key={key}><strong>{value}</strong><span>{key.replace(/([A-Z])/g, " $1")}</span></div>)}
                 </div>

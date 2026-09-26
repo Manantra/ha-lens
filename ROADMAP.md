@@ -39,10 +39,13 @@
 - [x] friendly names, areas, device metadata and icon identifiers
 - [ ] render Home Assistant / MDI icons visually
 - [x] no write-back in the first companion release
+- [x] search/filter automation picker
+- [x] latest Home Assistant trace highlighting
 
 ## Later
 
-- trace overlay
-- compare structure vs. last execution
+- [x] first latest-trace overlay
+- [ ] richer trace detail and branch outcomes
+- [ ] compare structure vs. last execution
 - automation diff visualization
 - optional lint rules with clearly documented semantics

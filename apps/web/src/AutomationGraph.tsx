@@ -6,7 +6,15 @@ import { layoutGraph } from "./layout";
 
 const nodeTypes = { lens: LensNode };
 
-export function AutomationGraph({ graph, highlightedNodeIds }: { graph: AutomationGraphModel; highlightedNodeIds: Set<string> }) {
+export function AutomationGraph({
+  graph,
+  highlightedNodeIds,
+  traceNodeIds,
+}: {
+  graph: AutomationGraphModel;
+  highlightedNodeIds: Set<string>;
+  traceNodeIds: Set<string>;
+}) {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
 
@@ -23,15 +31,24 @@ export function AutomationGraph({ graph, highlightedNodeIds }: { graph: Automati
   }, [graph]);
 
   const displayNodes = useMemo(
-    () => nodes.map((node) => ({ ...node, className: highlightedNodeIds.size && !highlightedNodeIds.has(node.id) ? "is-dimmed" : "" })),
-    [nodes, highlightedNodeIds],
+    () => nodes.map((node) => ({
+      ...node,
+      className: [
+        highlightedNodeIds.size && !highlightedNodeIds.has(node.id) ? "is-dimmed" : "",
+        traceNodeIds.has(node.id) ? "is-traced" : "",
+      ].filter(Boolean).join(" "),
+    })),
+    [nodes, highlightedNodeIds, traceNodeIds],
   );
   const displayEdges = useMemo(
     () => edges.map((edge) => ({
       ...edge,
-      className: highlightedNodeIds.size && !(highlightedNodeIds.has(edge.source) && highlightedNodeIds.has(edge.target)) ? "is-dimmed" : "",
+      className: [
+        highlightedNodeIds.size && !(highlightedNodeIds.has(edge.source) && highlightedNodeIds.has(edge.target)) ? "is-dimmed" : "",
+        traceNodeIds.has(edge.source) && traceNodeIds.has(edge.target) ? "is-traced" : "",
+      ].filter(Boolean).join(" "),
     })),
-    [edges, highlightedNodeIds],
+    [edges, highlightedNodeIds, traceNodeIds],
   );
 
   return (
