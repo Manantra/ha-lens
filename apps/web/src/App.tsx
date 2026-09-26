@@ -132,6 +132,7 @@ export function App() {
   const [selectedPath, setSelectedPath] = useState<ExecutionPath | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [presentation, setPresentation] = useState(false);
+  const [yamlCollapsed, setYamlCollapsed] = useState(false);
   const [exporting, setExporting] = useState<GraphExportFormat | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const [entityMetadata, setEntityMetadata] = useState<Record<string, CompanionEntityMetadata>>({});
@@ -303,9 +304,21 @@ export function App() {
         </div>
       </header>}
 
-      <section className="workspace">
+      <section className={`workspace ${yamlCollapsed ? "workspace--yaml-collapsed" : ""}`}>
         <aside className="yaml-panel panel">
-          <div className="panel__header"><strong>Automation YAML</strong><span>local only</span></div>
+          <div className="panel__header">
+            <strong>Automation YAML</strong>
+            <div className="yaml-panel__tools">
+              <span>local only</span>
+              <button
+                className="ghost yaml-toggle"
+                onClick={() => setYamlCollapsed(true)}
+                title="Hide automation YAML and give the graph more space"
+              >
+                Hide YAML
+              </button>
+            </div>
+          </div>
           <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setTrace(null); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
         </aside>
 
@@ -313,6 +326,15 @@ export function App() {
           <div className="panel__header">
             <strong>{result.ok ? result.automation.alias : "Automation map"}</strong>
             <div className="panel__header-actions">
+              {yamlCollapsed && (
+                <button
+                  className="ghost yaml-toggle"
+                  onClick={() => setYamlCollapsed(false)}
+                  title="Show automation YAML"
+                >
+                  Show YAML
+                </button>
+              )}
               {trace && result.ok && (
                 <button
                   className={`trace-toggle ${showTrace ? "is-active" : ""}`}
