@@ -10,6 +10,7 @@ export function AutomationGraph({
   graph,
   highlightedNodeIds,
   traceNodeIds,
+  traceEdgeIds,
   focusNodeIds,
   refitKey,
   fitMode = "all",
@@ -17,6 +18,7 @@ export function AutomationGraph({
   graph: AutomationGraphModel;
   highlightedNodeIds: Set<string>;
   traceNodeIds: Set<string>;
+  traceEdgeIds?: Set<string>;
   focusNodeIds?: Set<string>;
   refitKey?: boolean;
   fitMode?: "all" | "width";
@@ -90,10 +92,10 @@ export function AutomationGraph({
       ...edge,
       className: [
         highlightedNodeIds.size && !(highlightedNodeIds.has(edge.source) && highlightedNodeIds.has(edge.target)) ? "is-dimmed" : "",
-        traceNodeIds.has(edge.source) && traceNodeIds.has(edge.target) ? "is-traced" : "",
+        (traceEdgeIds?.has(edge.id) || (traceNodeIds.has(edge.source) && traceNodeIds.has(edge.target))) ? "is-traced" : "",
       ].filter(Boolean).join(" "),
     })),
-    [edges, highlightedNodeIds, traceNodeIds],
+    [edges, highlightedNodeIds, traceEdgeIds, traceNodeIds],
   );
 
   return (

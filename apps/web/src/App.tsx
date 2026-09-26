@@ -7,6 +7,13 @@ import { enumerateExecutionPaths } from "@ha-lens/paths";
 import type { ExecutionPath } from "@ha-lens/model";
 import { exportAutomationGraph, type GraphExportFormat } from "./exportGraph";
 import { AutomationGraph } from "./AutomationGraph";
+import {
+  buildTraceSemanticLabels,
+  traceBranchEdgeIds,
+  traceNodeIds,
+  tracePathToNodeId,
+  tracePathToSemanticId,
+} from "./traceMapping";
 import { sampleAutomation } from "./sample";
 
 type Tab = "summary" | "paths" | "entities" | "trace" | "insights" | "explain";
@@ -39,34 +46,6 @@ interface CompanionTrace {
   notTriggered?: boolean;
   paths: string[];
   steps?: CompanionTraceStep[];
-}
-
-function tracePathToNodeId(path: string, nodeIds: string[]): string | null {
-  const available = new Set(nodeIds);
-  const parts = path.split("/").filter(Boolean);
-  if (!parts.length) return null;
-
-  if (parts[0] === "trigger") parts[0] = "triggers";
-  else if (parts[0] === "condition") parts[0] = "conditions";
-  else if (parts[0] === "action") parts[0] = "actions";
-  else return null;
-
-  while (parts.length) {
-    const candidate = parts.join(".");
-    if (available.has(candidate)) return candidate;
-    parts.pop();
-  }
-
-  return null;
-}
-
-function traceNodeIds(paths: string[], nodeIds: string[]): Set<string> {
-  const output = new Set<string>();
-  for (const path of paths) {
-    const nodeId = tracePathToNodeId(path, nodeIds);
-    if (nodeId) output.add(nodeId);
-  }
-  return output;
 }
 
 function formatTraceResult(value: unknown): string | null {
@@ -218,6 +197,18 @@ export function App() {
     [result],
   );
 
+  const traceSemanticLabels = useMemo(
+    () => result.ok ? buildTraceSemanticLabels(result.automation) : new Map<string, string>(),
+    [result],
+  );
+
+  const tracedEdgeIds = useMemo(
+    () => result.ok && trace && showTrace
+      ? traceBranchEdgeIds(trace.steps ?? trace.paths.map((path) => ({ path })), result.graph)
+      : new Set<string>(),
+    [result, showTrace, trace],
+  );
+
   const tabs = useMemo<Tab[]>(
     () => trace
       ? ["summary", "paths", "entities", "trace", "insights", "explain"]
@@ -285,7 +276,7 @@ export function App() {
             <button onClick={() => setPresentation(false)}>Exit presentation</button>
           </div>
         </header>
-        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} focusNodeIds={entityFocusNodeIds} fitMode={graphFitMode} /></div>
+        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} focusNodeIds={entityFocusNodeIds} fitMode={graphFitMode} /></div>
       </main>
     );
   }
@@ -385,7 +376,7 @@ export function App() {
               </div>
             )}
             <div className="graph-canvas">
-              {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} focusNodeIds={entityFocusNodeIds} refitKey={yamlCollapsed} fitMode={graphFitMode} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
+              {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} focusNodeIds={entityFocusNodeIds} refitKey={yamlCollapsed} fitMode={graphFitMode} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
             </div>
           </div>
         </section>
@@ -540,6 +531,8 @@ export function App() {
                   ).map((step, index) => {
                     const nodeId = tracePathToNodeId(step.path, result.graph.nodes.map((node) => node.id));
                     const node = nodeId ? graphNodeById.get(nodeId) : undefined;
+                    const semanticId = tracePathToSemanticId(step.path, traceSemanticLabels.keys());
+                    const semanticLabel = semanticId ? traceSemanticLabels.get(semanticId) : undefined;
                     const resultText = formatTraceResult(step.result);
                     const selected = Boolean(nodeId && selectedTraceNodeId === nodeId);
                     return (
@@ -556,7 +549,7 @@ export function App() {
                       >
                         <span className="trace-step__number">{index + 1}</span>
                         <span className="trace-step__body">
-                          <strong>{node?.label || step.path}</strong>
+                          <strong>{semanticLabel || node?.label || step.path}</strong>
                           <code>{step.path}</code>
                           {(resultText || step.error) && (
                             <small className={step.error ? "trace-step__error" : ""}>
