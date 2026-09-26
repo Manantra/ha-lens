@@ -1,7 +1,7 @@
 {
   "domain": "ha_lens",
   "name": "HA Lens",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "codeowners": [
     "@Manantra"
   ],
