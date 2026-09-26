@@ -29,15 +29,26 @@ def websocket_automations(
     """List automations that are actually loaded by Home Assistant."""
     component = hass.data.get(AUTOMATION_DATA_COMPONENT)
     if component is None:
-        connection.send_result(msg["id"], [])
+        connection.send_result(
+            msg["id"],
+            {
+                "automations": [],
+                "total_loaded": 0,
+                "usable": 0,
+                "hidden_without_config": 0,
+            },
+        )
         return
 
     automations = []
+    total_loaded = 0
+    hidden_without_config = 0
     for automation in component.entities:
         entity_id = automation.entity_id
         if not entity_id:
             continue
 
+        total_loaded += 1
         state = hass.states.get(entity_id)
         friendly_name = (
             state.attributes.get("friendly_name")
@@ -46,6 +57,7 @@ def websocket_automations(
         )
         raw_config = automation.raw_config
         if not isinstance(raw_config, dict) or not raw_config:
+            hidden_without_config += 1
             continue
 
         config = dict(raw_config)
@@ -61,7 +73,15 @@ def websocket_automations(
         )
 
     automations.sort(key=lambda item: item["name"].casefold())
-    connection.send_result(msg["id"], automations)
+    connection.send_result(
+        msg["id"],
+        {
+            "automations": automations,
+            "total_loaded": total_loaded,
+            "usable": len(automations),
+            "hidden_without_config": hidden_without_config,
+        },
+    )
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

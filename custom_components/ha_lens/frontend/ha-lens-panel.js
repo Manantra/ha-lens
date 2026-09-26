@@ -11,6 +11,7 @@ class HaLensPanel extends HTMLElement {
     this._registryPromise = null;
     this._automationItems = [];
     this._automationListPromise = null;
+    this._diagnosticsText = "";
     this._targetOrigin = window.location.origin;
     this._onWindowMessage = this._onWindowMessage.bind(this);
   }
@@ -193,8 +194,13 @@ class HaLensPanel extends HTMLElement {
     if (this._automationListPromise) return this._automationListPromise;
 
     this._automationListPromise = this._hass.callWS({ type: "ha_lens/automations" })
-      .then((items) => {
-        this._automationItems = (Array.isArray(items) ? items : [])
+      .then((payload) => {
+        const items = Array.isArray(payload) ? payload : (payload?.automations ?? []);
+        const usable = Array.isArray(payload) ? items.length : (payload?.usable ?? items.length);
+        const hidden = Array.isArray(payload) ? 0 : (payload?.hidden_without_config ?? 0);
+        const totalLoaded = Array.isArray(payload) ? items.length : (payload?.total_loaded ?? usable + hidden);
+
+        this._automationItems = items
           .filter((item) =>
             item?.entity_id
             && item?.config
@@ -208,9 +214,17 @@ class HaLensPanel extends HTMLElement {
             config: item.config ?? null,
           }))
           .sort((left, right) => left.name.localeCompare(right.name));
+
+        const diagnostics = [`${usable} available`];
+        if (hidden > 0) diagnostics.push(`${hidden} hidden (no readable config)`);
+        if (totalLoaded !== usable + hidden) diagnostics.push(`${totalLoaded} loaded by Home Assistant`);
+        this._diagnosticsText = diagnostics.join(" · ");
+
         this._syncAutomations();
         this._setStatus(
-          this._automationItems.length ? "Read-only · select an automation" : "No loaded automations found",
+          this._automationItems.length
+            ? `Read-only · ${this._diagnosticsText}`
+            : `No readable automations · ${this._diagnosticsText}`,
           false,
         );
       })
@@ -358,7 +372,11 @@ class HaLensPanel extends HTMLElement {
       };
 
       this._sendPending();
-      this._setStatus(selected ? selected.name : entityId, false);
+      const selectedLabel = selected ? selected.name : entityId;
+      this._setStatus(
+        this._diagnosticsText ? `${selectedLabel} · ${this._diagnosticsText}` : selectedLabel,
+        false,
+      );
     } catch (error) {
       console.error("HA Lens could not load the automation", error);
       const message =
