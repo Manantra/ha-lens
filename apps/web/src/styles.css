@@ -799,3 +799,19 @@ button.ghost { background: transparent; color: #dce3f5; }
   padding-top: 12px;
   padding-bottom: 12px;
 }
+
+
+/* Beta experiment: clearer branch label pills */
+.react-flow__edge-text {
+  fill: #c8d2e6;
+  font-size: 9px;
+  font-weight: 750;
+}
+.react-flow__edge-textbg {
+  fill: #151b25;
+  fill-opacity: .96;
+  stroke: #354057;
+  stroke-width: 1px;
+  rx: 6px;
+  ry: 6px;
+}
