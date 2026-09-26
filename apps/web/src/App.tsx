@@ -413,6 +413,7 @@ export function App() {
                     const displayName = metadata?.name && metadata.name !== entity ? metadata.name : entity;
                     const usageCount = result.analysis.entityUsages[entity]?.length ?? 0;
                     const usageDetails = result.analysis.entityUsageDetails[entity] ?? [];
+                    const referenceCount = usageDetails.length;
                     const focused = selectedEntity === entity;
                     return (
                       <button
@@ -446,9 +447,15 @@ export function App() {
                             </span>
                           )}
                         </span>
-                        <span className="entity-card__usage">
-                          <strong>{usageCount}</strong>
-                          <small>{usageCount === 1 ? "node" : "nodes"}</small>
+                        <span className="entity-card__usage" aria-label={`${usageCount} graph node${usageCount === 1 ? "" : "s"}, ${referenceCount} reference${referenceCount === 1 ? "" : "s"}`}>
+                          <span className="entity-card__usage-metric">
+                            <strong>{usageCount}</strong>
+                            <small>{usageCount === 1 ? "graph node" : "graph nodes"}</small>
+                          </span>
+                          <span className="entity-card__usage-metric">
+                            <strong>{referenceCount}</strong>
+                            <small>{referenceCount === 1 ? "reference" : "references"}</small>
+                          </span>
                         </span>
                       </button>
                     );

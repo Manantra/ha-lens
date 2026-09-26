@@ -714,3 +714,54 @@ button.ghost { background: transparent; color: #dce3f5; }
   min-width: 0;
   min-height: 0;
 }
+
+
+/* Entity usage split: visible graph nodes vs concrete references */
+.entity-card__usage {
+  min-width: 62px;
+  gap: 8px;
+}
+.entity-card__usage-metric {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+.entity-card__usage-metric + .entity-card__usage-metric {
+  width: 100%;
+  padding-top: 7px;
+  border-top: 1px solid #28303e;
+}
+.entity-card__usage-metric strong {
+  color: #cbd7ef;
+  font-size: 14px;
+  line-height: 1;
+}
+.entity-card__usage-metric small {
+  margin-top: 0;
+  color: #68758c;
+  font-size: 7px;
+  font-weight: 750;
+  line-height: 1.15;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+@media (max-width: 480px) {
+  .entity-card__usage {
+    flex-direction: row;
+    align-items: stretch;
+    gap: 0;
+  }
+  .entity-card__usage-metric {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+  .entity-card__usage-metric + .entity-card__usage-metric {
+    width: auto;
+    padding-top: 0;
+    padding-left: 10px;
+    border-top: 0;
+    border-left: 1px solid #28303e;
+  }
+}
