@@ -10,7 +10,9 @@
   "dependencies": [
     "frontend",
     "http",
-    "panel_custom"
+    "panel_custom",
+    "automation",
+    "websocket_api"
   ],
   "documentation": "https://github.com/Manantra/ha-lens",
   "issue_tracker": "https://github.com/Manantra/ha-lens/issues",

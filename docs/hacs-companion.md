@@ -6,11 +6,11 @@ The first companion release is intentionally read-only.
 
 - Adds **HA Lens** to the Home Assistant sidebar.
 - Lists loaded `automation.*` entities.
-- Reads the selected automation with Home Assistant's existing `automation/config` WebSocket command.
+- Lists and reads the actual automation objects loaded by Home Assistant through HA Lens' own admin-only, read-only WebSocket commands.
 - Passes only the selected automation configuration plus metadata for referenced entities to the HA Lens viewer in the browser.
 - Does not register any write action and does not modify automation YAML.
 
-The panel requires an administrator because Home Assistant's `automation/config` WebSocket command is admin-only.
+The panel requires an administrator. HA Lens only exposes read-only commands that list loaded automations and return their existing `raw_config`; it does not register any command that can modify an automation.
 
 ## Preview architecture
 

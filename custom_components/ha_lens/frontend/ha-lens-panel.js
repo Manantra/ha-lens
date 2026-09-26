@@ -9,13 +9,17 @@ class HaLensPanel extends HTMLElement {
     this._selected = "";
     this._pendingMessage = null;
     this._registryPromise = null;
+    this._automationItems = [];
+    this._automationListPromise = null;
     this._targetOrigin = window.location.origin;
     this._onWindowMessage = this._onWindowMessage.bind(this);
   }
 
   set hass(value) {
     this._hass = value;
-    this._syncAutomations();
+    if (this.isConnected && !this._automationListPromise) {
+      void this._refreshAutomations();
+    }
   }
 
   set panel(value) {
@@ -169,7 +173,7 @@ class HaLensPanel extends HTMLElement {
 
     this._frame.addEventListener("load", () => this._sendPending());
     this._applyPanelConfig();
-    this._syncAutomations();
+    void this._refreshAutomations();
   }
 
   _applyPanelConfig() {
@@ -181,15 +185,41 @@ class HaLensPanel extends HTMLElement {
   }
 
   _automations() {
-    if (!this._hass?.states) return [];
+    return this._automationItems;
+  }
 
-    return Object.values(this._hass.states)
-      .filter((state) => state.entity_id.startsWith("automation."))
-      .map((state) => ({
-        entityId: state.entity_id,
-        name: state.attributes?.friendly_name || state.entity_id,
-      }))
-      .sort((left, right) => left.name.localeCompare(right.name));
+  async _refreshAutomations() {
+    if (!this._hass?.callWS) return;
+    if (this._automationListPromise) return this._automationListPromise;
+
+    this._automationListPromise = this._hass.callWS({ type: "ha_lens/automations" })
+      .then((items) => {
+        this._automationItems = (Array.isArray(items) ? items : [])
+          .filter((item) => item?.entity_id && item?.has_config !== false)
+          .map((item) => ({
+            entityId: item.entity_id,
+            name: item.name || item.entity_id,
+            automationId: item.id ?? null,
+          }))
+          .sort((left, right) => left.name.localeCompare(right.name));
+        this._syncAutomations();
+        this._setStatus(
+          this._automationItems.length ? "Read-only · select an automation" : "No loaded automations found",
+          false,
+        );
+      })
+      .catch((error) => {
+        console.error("HA Lens could not list automations", error);
+        const message = error?.message || error?.code || String(error);
+        this._setStatus(`Could not list automations: ${message}`, true);
+        this._automationItems = [];
+        this._syncAutomations();
+      })
+      .finally(() => {
+        this._automationListPromise = null;
+      });
+
+    return this._automationListPromise;
   }
 
   _syncAutomations() {
@@ -304,28 +334,11 @@ class HaLensPanel extends HTMLElement {
     this._setStatus("Loading automation…", false);
 
     try {
-      const state = this._hass.states?.[entityId];
-      const automationId = state?.attributes?.id;
-      let config;
-
-      if (automationId != null && this._hass.callApi) {
-        try {
-          config = await this._hass.callApi(
-            "GET",
-            `config/automation/config/${encodeURIComponent(String(automationId))}`,
-          );
-        } catch (error) {
-          if (error?.status_code !== 404) throw error;
-        }
-      }
-
-      if (!config) {
-        const result = await this._hass.callWS({
-          type: "automation/config",
-          entity_id: entityId,
-        });
-        config = result?.config;
-      }
+      const result = await this._hass.callWS({
+        type: "ha_lens/automation/config",
+        entity_id: entityId,
+      });
+      const config = result?.config;
 
       if (!config) throw new Error("Home Assistant returned no automation config.");
 
