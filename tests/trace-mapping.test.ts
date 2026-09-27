@@ -69,6 +69,44 @@ actions:
     ).toBe("actions.0.if.0");
   });
 
+  it("maps inline compound-condition children to their own semantic labels", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Inline AND trace labels
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+actions:
+  - condition: and
+    conditions:
+      - condition: state
+        entity_id: binary_sensor.first
+        state: "on"
+      - condition: state
+        entity_id: binary_sensor.second
+        state: "on"
+  - action: light.turn_on
+    target:
+      entity_id: light.hall
+`);
+
+    const labels = buildTraceSemanticLabels(automation);
+    expect(labels.get("actions.0.condition.conditions.0")).toContain("binary_sensor.first");
+    expect(labels.get("actions.0.condition.conditions.1")).toContain("binary_sensor.second");
+
+    expect(
+      tracePathToSemanticId(
+        "action/0/conditions/0/entity_id/0",
+        labels.keys(),
+      ),
+    ).toBe("actions.0.condition.conditions.0");
+    expect(
+      tracePathToSemanticId(
+        "action/0/conditions/1/entity_id/0",
+        labels.keys(),
+      ),
+    ).toBe("actions.0.condition.conditions.1");
+  });
+
   it("marks the taken if and choose branch edges from trace results", () => {
     const { automation } = parseAutomationYaml(`
 alias: Branch coverage

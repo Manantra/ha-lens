@@ -63,10 +63,28 @@ function candidateIds(parts: string[]): string[] {
   return output;
 }
 
+function inlineConditionVariants(parts: string[]): string[][] {
+  const variants: string[][] = [];
+  for (let index = 0; index < parts.length; index += 1) {
+    if (parts[index] !== "conditions") continue;
+
+    const variant = [...parts];
+    variant.splice(index, 0, "condition");
+    variants.push(variant);
+  }
+  return variants;
+}
+
 function traceCandidates(path: string): string[] {
   const canonical = canonicalTraceSegments(path);
   const rootOnly = rootNormalizedSegments(path);
-  return [...new Set([...candidateIds(canonical), ...candidateIds(rootOnly)])];
+  const variants = [
+    canonical,
+    ...inlineConditionVariants(canonical),
+    rootOnly,
+    ...inlineConditionVariants(rootOnly),
+  ];
+  return [...new Set(variants.flatMap(candidateIds))];
 }
 
 function resolveTracePath(path: string, ids: Iterable<string>): string | null {
