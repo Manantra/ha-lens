@@ -175,18 +175,19 @@ export function traceBranchEdgeIds(
     const result = resultRecord(step.result);
     if (!result) continue;
 
-    const isChoose = step.path.split("/").includes("choose");
-    if (isChoose && result.choice != null) {
-      if (result.choice === "default") {
+    const choice = result.choice;
+    const isChooseChoice = choice != null && choice !== "then" && choice !== "else";
+    if (isChooseChoice) {
+      if (choice === "default") {
         const edgeId = matchingEdgeByLabel(graph, nodeId, "Default");
         if (edgeId) output.add(edgeId);
         continue;
       }
 
-      const choiceIndex = typeof result.choice === "number"
-        ? result.choice
-        : /^\d+$/.test(String(result.choice))
-          ? Number(result.choice)
+      const choiceIndex = typeof choice === "number"
+        ? choice
+        : /^\d+$/.test(String(choice))
+          ? Number(choice)
           : null;
 
       if (choiceIndex != null) {
@@ -202,9 +203,22 @@ export function traceBranchEdgeIds(
       continue;
     }
 
-    const branch = result.choice === "then" || result.result === true
+    if (result.timeout === true) {
+      const edgeId = matchingEdgeByLabel(graph, nodeId, "timeout");
+      if (edgeId) output.add(edgeId);
+      continue;
+    }
+
+    const wait = resultRecord(result.wait);
+    if (wait?.completed === true) {
+      const edgeId = matchingEdgeByLabel(graph, nodeId, "completed");
+      if (edgeId) output.add(edgeId);
+      continue;
+    }
+
+    const branch = choice === "then" || result.result === true
       ? "true"
-      : result.choice === "else" || result.result === false
+      : choice === "else" || result.result === false
         ? "false"
         : null;
 
@@ -215,4 +229,78 @@ export function traceBranchEdgeIds(
   }
 
   return output;
+}
+
+
+export interface TraceCoverage {
+  executedNodeIds: Set<string>;
+  executedEdgeIds: Set<string>;
+  takenEdgeIds: Set<string>;
+  notTakenEdgeIds: Set<string>;
+}
+
+/**
+ * Build a conservative last-run overlay.
+ *
+ * - executedNodeIds: graph nodes directly represented by Home Assistant trace paths
+ * - takenEdgeIds: decision/wait edges explicitly selected by runtime results
+ * - notTakenEdgeIds: sibling branch edges at a decision that produced a known outcome
+ * - executedEdgeIds: explicit taken edges plus deterministic flow between executed nodes
+ *
+ * Nodes behind an untaken branch are intentionally not labelled "checked"; only the
+ * branch edge itself receives that status. This avoids claiming runtime evaluation
+ * that Home Assistant did not report.
+ */
+export function buildTraceCoverage(
+  steps: TraceStepLike[],
+  graph: AutomationGraph,
+): TraceCoverage {
+  const nodeIds = graph.nodes.map((node) => node.id);
+  const executedNodeIds = traceNodeIds(steps.map((step) => step.path), nodeIds);
+  const takenEdgeIds = traceBranchEdgeIds(steps, graph);
+  const notTakenEdgeIds = new Set<string>();
+
+  const takenSources = new Set<string>();
+  for (const edge of graph.edges) {
+    if (takenEdgeIds.has(edge.id)) takenSources.add(edge.source);
+  }
+
+  for (const source of takenSources) {
+    for (const edge of graph.edges) {
+      if (
+        edge.source === source
+        && edge.label != null
+        && !takenEdgeIds.has(edge.id)
+      ) {
+        notTakenEdgeIds.add(edge.id);
+      }
+    }
+  }
+
+  const kindByNodeId = new Map(graph.nodes.map((node) => [node.id, node.kind]));
+  const executedEdgeIds = new Set<string>(takenEdgeIds);
+
+  for (const edge of graph.edges) {
+    if (notTakenEdgeIds.has(edge.id)) continue;
+
+    const sourceExecuted = executedNodeIds.has(edge.source);
+    const targetExecuted = executedNodeIds.has(edge.target);
+    const sourceKind = kindByNodeId.get(edge.source);
+    const targetKind = kindByNodeId.get(edge.target);
+
+    if (
+      (sourceExecuted && targetExecuted)
+      || (sourceExecuted && targetKind === "merge")
+      || (sourceKind === "merge" && targetExecuted)
+    ) {
+      executedEdgeIds.add(edge.id);
+    }
+  }
+
+  return {
+    executedNodeIds,
+    executedEdgeIds,
+    takenEdgeIds,
+    notTakenEdgeIds,
+  };
 }

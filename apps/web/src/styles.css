@@ -167,6 +167,8 @@ button.ghost { background: transparent; color: #dce3f5; }
 
 @media (max-width: 760px) {
   .graph-fit-controls { display: none; }
+  .run-coverage-legend { gap: 7px; max-width: calc(100% - 24px); overflow: hidden; }
+  .run-coverage-legend span { font-size: 8px; }
 
   .topbar {
     display: grid;
@@ -297,6 +299,49 @@ button.ghost { background: transparent; color: #dce3f5; }
 .fit-toggle.is-active { border-color: #617bd0; color: #d7e1ff; background: #202a43; }
 .trace-toggle { border: 1px solid #354057; background: #171d29; color: #95a4bf; border-radius: 999px; padding: 4px 9px; font-size: 10px; font-weight: 800; }
 .trace-toggle.is-active { border-color: #4fb67a; color: #b8f3cf; background: #173123; }
+.run-view-controls { display: flex; align-items: center; gap: 3px; padding: 2px; border: 1px solid #30394b; border-radius: 999px; background: #121722; }
+.run-view-controls .trace-toggle { border-color: transparent; background: transparent; padding: 3px 8px; }
+.run-view-controls .trace-toggle.is-active { border-color: #4fb67a; background: #173123; }
+.run-view-controls .trace-toggle.is-active.is-structure { border-color: #617bd0; color: #d7e1ff; background: #202a43; }
+
+.run-coverage-legend {
+  position: absolute;
+  z-index: 4;
+  top: 10px;
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid #2c3442;
+  border-radius: 9px;
+  background: rgba(14,18,25,.88);
+  color: #9da8ba;
+  font-size: 9px;
+  font-weight: 700;
+  pointer-events: none;
+  backdrop-filter: blur(6px);
+}
+.run-coverage-legend span { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.run-coverage-dot { width: 8px; height: 8px; border-radius: 999px; background: #535d70; }
+.run-coverage-dot.is-executed { background: #4fc37d; box-shadow: 0 0 0 2px rgba(79,195,125,.14); }
+.run-coverage-dot.is-not-reached { background: #535d70; opacity: .48; }
+.run-coverage-line { width: 14px; height: 0; border-top: 2px dashed #d6a34a; }
+
+.react-flow__node.is-run-executed .lens-node {
+  border-color: #4fc37d;
+  box-shadow: 0 0 0 1px rgba(79,195,125,.35), 0 10px 28px rgba(0,0,0,.22);
+}
+.react-flow__node.is-run-not-reached { opacity: .24; filter: saturate(.5); }
+.react-flow__edge.is-run-executed path { stroke: #4fc37d; stroke-width: 2.5; }
+.react-flow__edge.is-run-not-taken path {
+  stroke: #d6a34a;
+  stroke-width: 2.2;
+  stroke-dasharray: 7 5;
+  opacity: .96;
+}
+.react-flow__edge.is-run-not-taken .react-flow__edge-text { fill: #e5bd71; }
+.react-flow__edge.is-run-not-reached { opacity: .12; }
 .trace-card { margin: 12px 0 16px; padding: 12px; border: 1px solid #315943; border-radius: 12px; background: #122019; display: flex; flex-direction: column; gap: 8px; }
 .trace-card > div:first-child { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .trace-card strong { color: #dff7e8; font-size: 12px; }

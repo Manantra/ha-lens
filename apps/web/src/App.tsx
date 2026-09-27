@@ -9,8 +9,7 @@ import { exportAutomationGraph, type GraphExportFormat } from "./exportGraph";
 import { AutomationGraph } from "./AutomationGraph";
 import {
   buildTraceSemanticLabels,
-  traceBranchEdgeIds,
-  traceNodeIds,
+  buildTraceCoverage,
   tracePathToNodeId,
   tracePathToSemanticId,
 } from "./traceMapping";
@@ -187,10 +186,27 @@ export function App() {
     return new Set(selectedPath?.steps.map((step) => step.nodeId) ?? []);
   }, [entityFocusNodeIds, selectedPath, selectedTraceNodeId]);
 
-  const tracedNodeIds = useMemo(
-    () => result.ok && trace && showTrace ? traceNodeIds(trace.paths, result.graph.nodes.map((node) => node.id)) : new Set<string>(),
-    [result, showTrace, trace],
+  const traceCoverage = useMemo(
+    () => result.ok && trace
+      ? buildTraceCoverage(
+          trace.steps ?? trace.paths.map((path) => ({ path })),
+          result.graph,
+        )
+      : null,
+    [result, trace],
   );
+
+  const tracedNodeIds = showTrace && traceCoverage
+    ? traceCoverage.executedNodeIds
+    : new Set<string>();
+
+  const tracedEdgeIds = showTrace && traceCoverage
+    ? traceCoverage.executedEdgeIds
+    : new Set<string>();
+
+  const traceNotTakenEdgeIds = showTrace && traceCoverage
+    ? traceCoverage.notTakenEdgeIds
+    : new Set<string>();
 
   const graphNodeById = useMemo(
     () => result.ok ? new Map(result.graph.nodes.map((node) => [node.id, node])) : new Map(),
@@ -200,13 +216,6 @@ export function App() {
   const traceSemanticLabels = useMemo(
     () => result.ok ? buildTraceSemanticLabels(result.automation) : new Map<string, string>(),
     [result],
-  );
-
-  const tracedEdgeIds = useMemo(
-    () => result.ok && trace && showTrace
-      ? traceBranchEdgeIds(trace.steps ?? trace.paths.map((path) => ({ path })), result.graph)
-      : new Set<string>(),
-    [result, showTrace, trace],
   );
 
   const tabs = useMemo<Tab[]>(
@@ -276,7 +285,7 @@ export function App() {
             <button onClick={() => setPresentation(false)}>Exit presentation</button>
           </div>
         </header>
-        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} focusNodeIds={entityFocusNodeIds} fitMode={graphFitMode} /></div>
+        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} traceNotTakenEdgeIds={traceNotTakenEdgeIds} traceCoverageActive={Boolean(trace && showTrace)} focusNodeIds={entityFocusNodeIds} fitMode={graphFitMode} /></div>
       </main>
     );
   }
@@ -345,16 +354,28 @@ export function App() {
                 </button>
               )}
               {trace && result.ok && (
-                <button
-                  className={`trace-toggle ${showTrace ? "is-active" : ""}`}
-                  onClick={() => {
-                    setSelectedTraceNodeId(null);
-                    setShowTrace((value) => !value);
-                  }}
-                  title="Highlight nodes touched by the latest Home Assistant trace"
-                >
-                  Last run
-                </button>
+                <div className="run-view-controls" aria-label="Graph view mode">
+                  <button
+                    className={`trace-toggle ${!showTrace ? "is-active is-structure" : ""}`}
+                    onClick={() => {
+                      setSelectedTraceNodeId(null);
+                      setShowTrace(false);
+                    }}
+                    title="Show the complete static automation structure"
+                  >
+                    Structure
+                  </button>
+                  <button
+                    className={`trace-toggle ${showTrace ? "is-active" : ""}`}
+                    onClick={() => {
+                      setSelectedTraceNodeId(null);
+                      setShowTrace(true);
+                    }}
+                    title="Compare the latest Home Assistant run with the static structure"
+                  >
+                    Last run
+                  </button>
+                </div>
               )}
               <span>{result.ok ? `${result.paths.length} paths` : "Waiting for valid YAML"}</span>
             </div>
@@ -376,7 +397,14 @@ export function App() {
               </div>
             )}
             <div className="graph-canvas">
-              {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} focusNodeIds={entityFocusNodeIds} refitKey={yamlCollapsed} fitMode={graphFitMode} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
+              {trace && showTrace && result.ok && (
+                <div className="run-coverage-legend" aria-label="Last run coverage legend">
+                  <span><i className="run-coverage-dot is-executed" />Executed</span>
+                  <span><i className="run-coverage-line is-not-taken" />Branch not taken</span>
+                  <span><i className="run-coverage-dot is-not-reached" />Not reached</span>
+                </div>
+              )}
+              {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} traceNotTakenEdgeIds={traceNotTakenEdgeIds} traceCoverageActive={Boolean(trace && showTrace)} focusNodeIds={entityFocusNodeIds} refitKey={yamlCollapsed} fitMode={graphFitMode} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
             </div>
           </div>
         </section>

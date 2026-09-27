@@ -11,6 +11,8 @@ export function AutomationGraph({
   highlightedNodeIds,
   traceNodeIds,
   traceEdgeIds,
+  traceNotTakenEdgeIds,
+  traceCoverageActive = false,
   focusNodeIds,
   refitKey,
   fitMode = "all",
@@ -19,6 +21,8 @@ export function AutomationGraph({
   highlightedNodeIds: Set<string>;
   traceNodeIds: Set<string>;
   traceEdgeIds?: Set<string>;
+  traceNotTakenEdgeIds?: Set<string>;
+  traceCoverageActive?: boolean;
   focusNodeIds?: Set<string>;
   refitKey?: boolean;
   fitMode?: "all" | "width";
@@ -27,6 +31,14 @@ export function AutomationGraph({
   const [edges, setEdges] = useState<Edge[]>([]);
   const [flow, setFlow] = useState<ReactFlowInstance<Node, Edge> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const structuralNodeIds = useMemo(
+    () => new Set(
+      graph.nodes
+        .filter((node) => node.kind === "merge" || node.kind === "end")
+        .map((node) => node.id),
+    ),
+    [graph],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -78,24 +90,40 @@ export function AutomationGraph({
   }, [fitMode, flow, focusNodeIds, nodes, refitKey]);
 
   const displayNodes = useMemo(
-    () => nodes.map((node) => ({
-      ...node,
-      className: [
-        highlightedNodeIds.size && !highlightedNodeIds.has(node.id) ? "is-dimmed" : "",
-        traceNodeIds.has(node.id) ? "is-traced" : "",
-      ].filter(Boolean).join(" "),
-    })),
-    [nodes, highlightedNodeIds, traceNodeIds],
+    () => nodes.map((node) => {
+      const executed = traceCoverageActive && traceNodeIds.has(node.id);
+      const notReached = traceCoverageActive
+        && !executed
+        && !structuralNodeIds.has(node.id);
+
+      return {
+        ...node,
+        className: [
+          highlightedNodeIds.size && !highlightedNodeIds.has(node.id) ? "is-dimmed" : "",
+          executed ? "is-traced is-run-executed" : "",
+          notReached ? "is-run-not-reached" : "",
+        ].filter(Boolean).join(" "),
+      };
+    }),
+    [nodes, highlightedNodeIds, structuralNodeIds, traceCoverageActive, traceNodeIds],
   );
   const displayEdges = useMemo(
-    () => edges.map((edge) => ({
-      ...edge,
-      className: [
-        highlightedNodeIds.size && !(highlightedNodeIds.has(edge.source) && highlightedNodeIds.has(edge.target)) ? "is-dimmed" : "",
-        (traceEdgeIds?.has(edge.id) || (traceNodeIds.has(edge.source) && traceNodeIds.has(edge.target))) ? "is-traced" : "",
-      ].filter(Boolean).join(" "),
-    })),
-    [edges, highlightedNodeIds, traceEdgeIds, traceNodeIds],
+    () => edges.map((edge) => {
+      const executed = traceCoverageActive && Boolean(traceEdgeIds?.has(edge.id));
+      const notTaken = traceCoverageActive && Boolean(traceNotTakenEdgeIds?.has(edge.id));
+      const notReached = traceCoverageActive && !executed && !notTaken;
+
+      return {
+        ...edge,
+        className: [
+          highlightedNodeIds.size && !(highlightedNodeIds.has(edge.source) && highlightedNodeIds.has(edge.target)) ? "is-dimmed" : "",
+          executed ? "is-traced is-run-executed" : "",
+          notTaken ? "is-run-not-taken" : "",
+          notReached ? "is-run-not-reached" : "",
+        ].filter(Boolean).join(" "),
+      };
+    }),
+    [edges, highlightedNodeIds, traceCoverageActive, traceEdgeIds, traceNotTakenEdgeIds],
   );
 
   return (

@@ -4,6 +4,7 @@ import { parseAutomationYaml } from "@ha-lens/parser";
 import {
   buildTraceSemanticLabels,
   canonicalTraceSegments,
+  buildTraceCoverage,
   traceBranchEdgeIds,
   tracePathToNodeId,
   tracePathToSemanticId,
@@ -149,12 +150,78 @@ actions:
     const graph = buildAutomationGraph(automation);
     const edgeIds = traceBranchEdgeIds([
       { path: "action/0/if", result: { result: false } },
-      { path: "action/1/choose", result: { choice: 1 } },
+      // Real Home Assistant choose results are reported on the action path itself.
+      { path: "action/1", result: { choice: 1 } },
     ], graph);
 
     const tracedEdges = graph.edges.filter((edge) => edgeIds.has(edge.id));
     expect(tracedEdges.map((edge) => edge.label)).toEqual(
       expect.arrayContaining(["false", "Guests"]),
     );
+  });
+
+  it("classifies executed, untaken, and unreached graph flow conservatively", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Last run coverage
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+actions:
+  - if:
+      - condition: state
+        entity_id: input_boolean.away
+        state: "on"
+    then:
+      - action: light.turn_off
+        target:
+          entity_id: light.hall
+    else:
+      - action: light.turn_on
+        target:
+          entity_id: light.hall
+  - choose:
+      - conditions:
+          - condition: state
+            entity_id: input_boolean.night
+            state: "on"
+        sequence:
+          - action: scene.turn_on
+            target:
+              entity_id: scene.night
+      - alias: Guests
+        conditions:
+          - condition: state
+            entity_id: input_boolean.guests
+            state: "on"
+        sequence:
+          - action: scene.turn_on
+            target:
+              entity_id: scene.guests
+`);
+
+    const graph = buildAutomationGraph(automation);
+    const coverage = buildTraceCoverage([
+      { path: "trigger/0" },
+      { path: "action/0/if", result: { result: false } },
+      { path: "action/0/else/0" },
+      { path: "action/1", result: { choice: 1 } },
+      { path: "action/1/choose/1/sequence/0" },
+    ], graph);
+
+    expect(coverage.executedNodeIds).toContain("actions.0");
+    expect(coverage.executedNodeIds).toContain("actions.0.else.0");
+    expect(coverage.executedNodeIds).not.toContain("actions.0.then.0");
+    expect(coverage.executedNodeIds).toContain("actions.1.choose.1.sequence.0");
+    expect(coverage.executedNodeIds).not.toContain("actions.1.choose.0.sequence.0");
+
+    const takenLabels = graph.edges
+      .filter((edge) => coverage.takenEdgeIds.has(edge.id))
+      .map((edge) => edge.label);
+    expect(takenLabels).toEqual(expect.arrayContaining(["false", "Guests"]));
+
+    const notTakenLabels = graph.edges
+      .filter((edge) => coverage.notTakenEdgeIds.has(edge.id))
+      .map((edge) => edge.label);
+    expect(notTakenLabels).toEqual(expect.arrayContaining(["true", "Option 1", "No match"]));
   });
 });
