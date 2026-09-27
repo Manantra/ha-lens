@@ -6,7 +6,7 @@ import { parseAutomationYaml, serializeAutomationYaml } from "@ha-lens/parser";
 import { enumerateExecutionPaths } from "@ha-lens/paths";
 import type { ExecutionPath } from "@ha-lens/model";
 import { exportAutomationGraph, type GraphExportFormat } from "./exportGraph";
-import { AutomationGraph } from "./AutomationGraph";
+import { AutomationGraph, type TraceNodeBadge } from "./AutomationGraph";
 import {
   buildTraceSemanticLabels,
   buildTraceCoverage,
@@ -29,6 +29,7 @@ interface CompanionEntityMetadata {
 interface CompanionTraceStep {
   path: string;
   occurrence?: number;
+  repeatIndex?: number | null;
   timestamp?: string | null;
   error?: string | null;
   result?: unknown;
@@ -208,6 +209,29 @@ export function App() {
     ? traceCoverage.notTakenEdgeIds
     : new Set<string>();
 
+  const traceNodeBadges = useMemo(() => {
+    const badges = new Map<string, TraceNodeBadge>();
+    if (!showTrace || !traceCoverage) return badges;
+
+    for (const [nodeId, count] of traceCoverage.repeatIterationCounts) {
+      badges.set(nodeId, {
+        label: `${count} ${count === 1 ? "iteration" : "iterations"}`,
+        tone: count > 0 ? "good" : "neutral",
+      });
+    }
+
+    for (const [nodeId, coverage] of traceCoverage.parallelBranchCoverage) {
+      const observed = coverage.observedBranchIndexes.size;
+      const total = coverage.totalBranches;
+      badges.set(nodeId, {
+        label: `${observed}/${total} branches`,
+        tone: total > 0 && observed === total ? "good" : "partial",
+      });
+    }
+
+    return badges;
+  }, [showTrace, traceCoverage]);
+
   const graphNodeById = useMemo(
     () => result.ok ? new Map(result.graph.nodes.map((node) => [node.id, node])) : new Map(),
     [result],
@@ -285,7 +309,7 @@ export function App() {
             <button onClick={() => setPresentation(false)}>Exit presentation</button>
           </div>
         </header>
-        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} traceNotTakenEdgeIds={traceNotTakenEdgeIds} traceCoverageActive={Boolean(trace && showTrace)} focusNodeIds={entityFocusNodeIds} fitMode={graphFitMode} /></div>
+        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} traceNotTakenEdgeIds={traceNotTakenEdgeIds} traceNodeBadges={traceNodeBadges} traceCoverageActive={Boolean(trace && showTrace)} focusNodeIds={entityFocusNodeIds} fitMode={graphFitMode} /></div>
       </main>
     );
   }
@@ -404,7 +428,7 @@ export function App() {
                   <span><i className="run-coverage-dot is-not-reached" />Not reached</span>
                 </div>
               )}
-              {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} traceNotTakenEdgeIds={traceNotTakenEdgeIds} traceCoverageActive={Boolean(trace && showTrace)} focusNodeIds={entityFocusNodeIds} refitKey={yamlCollapsed} fitMode={graphFitMode} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
+              {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} traceNotTakenEdgeIds={traceNotTakenEdgeIds} traceNodeBadges={traceNodeBadges} traceCoverageActive={Boolean(trace && showTrace)} focusNodeIds={entityFocusNodeIds} refitKey={yamlCollapsed} fitMode={graphFitMode} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
             </div>
           </div>
         </section>
@@ -562,6 +586,10 @@ export function App() {
                     const semanticId = tracePathToSemanticId(step.path, traceSemanticLabels.keys());
                     const semanticLabel = semanticId ? traceSemanticLabels.get(semanticId) : undefined;
                     const resultText = formatTraceResult(step.result);
+                    const stepDetail = [
+                      step.error || resultText,
+                      step.repeatIndex ? `iteration ${step.repeatIndex}` : null,
+                    ].filter(Boolean).join(" · ");
                     const selected = Boolean(nodeId && selectedTraceNodeId === nodeId);
                     return (
                       <button
@@ -579,9 +607,9 @@ export function App() {
                         <span className="trace-step__body">
                           <strong>{semanticLabel || node?.label || step.path}</strong>
                           <code>{step.path}</code>
-                          {(resultText || step.error) && (
+                          {stepDetail && (
                             <small className={step.error ? "trace-step__error" : ""}>
-                              {step.error || resultText}
+                              {stepDetail}
                             </small>
                           )}
                         </span>

@@ -6,12 +6,18 @@ import { layoutGraph } from "./layout";
 
 const nodeTypes = { lens: LensNode };
 
+export interface TraceNodeBadge {
+  label: string;
+  tone?: "good" | "partial" | "neutral";
+}
+
 export function AutomationGraph({
   graph,
   highlightedNodeIds,
   traceNodeIds,
   traceEdgeIds,
   traceNotTakenEdgeIds,
+  traceNodeBadges,
   traceCoverageActive = false,
   focusNodeIds,
   refitKey,
@@ -22,6 +28,7 @@ export function AutomationGraph({
   traceNodeIds: Set<string>;
   traceEdgeIds?: Set<string>;
   traceNotTakenEdgeIds?: Set<string>;
+  traceNodeBadges?: Map<string, TraceNodeBadge>;
   traceCoverageActive?: boolean;
   focusNodeIds?: Set<string>;
   refitKey?: boolean;
@@ -96,8 +103,15 @@ export function AutomationGraph({
         && !executed
         && !structuralNodeIds.has(node.id);
 
+      const runtimeBadge = traceCoverageActive ? traceNodeBadges?.get(node.id) : undefined;
+
       return {
         ...node,
+        data: {
+          ...node.data,
+          runtimeBadge: runtimeBadge?.label,
+          runtimeBadgeTone: runtimeBadge?.tone,
+        },
         className: [
           highlightedNodeIds.size && !highlightedNodeIds.has(node.id) ? "is-dimmed" : "",
           executed ? "is-traced is-run-executed" : "",
@@ -105,7 +119,7 @@ export function AutomationGraph({
         ].filter(Boolean).join(" "),
       };
     }),
-    [nodes, highlightedNodeIds, structuralNodeIds, traceCoverageActive, traceNodeIds],
+    [nodes, highlightedNodeIds, structuralNodeIds, traceCoverageActive, traceNodeBadges, traceNodeIds],
   );
   const displayEdges = useMemo(
     () => edges.map((edge) => {

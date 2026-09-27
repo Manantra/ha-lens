@@ -391,13 +391,17 @@ class HaLensPanel extends HTMLElement {
       const traceEntries = Object.entries(extended?.trace || {});
       const steps = traceEntries
         .flatMap(([path, entries]) =>
-          (Array.isArray(entries) ? entries : []).map((entry, occurrence) => ({
-            path,
-            occurrence,
-            timestamp: entry?.timestamp || null,
-            error: entry?.error || null,
-            result: entry?.result ?? null,
-          }))
+          (Array.isArray(entries) ? entries : []).map((entry, occurrence) => {
+            const repeatIndex = entry?.changed_variables?.repeat?.index;
+            return {
+              path,
+              occurrence,
+              repeatIndex: Number.isInteger(repeatIndex) && repeatIndex > 0 ? repeatIndex : null,
+              timestamp: entry?.timestamp || null,
+              error: entry?.error || null,
+              result: entry?.result ?? null,
+            };
+          })
         )
         .sort((left, right) => {
           const timeOrder = String(left.timestamp || "").localeCompare(String(right.timestamp || ""));

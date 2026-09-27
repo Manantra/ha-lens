@@ -7,6 +7,8 @@ import type {
 
 export interface TraceStepLike {
   path: string;
+  occurrence?: number;
+  repeatIndex?: number | null;
   result?: unknown;
 }
 
@@ -232,11 +234,18 @@ export function traceBranchEdgeIds(
 }
 
 
+export interface ParallelTraceCoverage {
+  observedBranchIndexes: Set<number>;
+  totalBranches: number;
+}
+
 export interface TraceCoverage {
   executedNodeIds: Set<string>;
   executedEdgeIds: Set<string>;
   takenEdgeIds: Set<string>;
   notTakenEdgeIds: Set<string>;
+  repeatIterationCounts: Map<string, number>;
+  parallelBranchCoverage: Map<string, ParallelTraceCoverage>;
 }
 
 /**
@@ -251,6 +260,85 @@ export interface TraceCoverage {
  * branch edge itself receives that status. This avoids claiming runtime evaluation
  * that Home Assistant did not report.
  */
+function parentControlPath(
+  path: string,
+  token: "repeat" | "parallel",
+): { parentPath: string; tokenIndex: number; parts: string[] } | null {
+  const parts = path.split("/").filter(Boolean);
+  const tokenIndex = parts.lastIndexOf(token);
+  if (tokenIndex <= 0) return null;
+  return {
+    parentPath: parts.slice(0, tokenIndex).join("/"),
+    tokenIndex,
+    parts,
+  };
+}
+
+function repeatIterationCounts(
+  steps: TraceStepLike[],
+  graph: AutomationGraph,
+  executedNodeIds: Set<string>,
+): Map<string, number> {
+  const nodeIds = graph.nodes.map((node) => node.id);
+  const output = new Map<string, number>();
+
+  for (const node of graph.nodes) {
+    if (node.kind === "loop" && executedNodeIds.has(node.id)) {
+      output.set(node.id, 0);
+    }
+  }
+
+  for (const step of steps) {
+    const control = parentControlPath(step.path, "repeat");
+    if (!control || control.parts[control.tokenIndex + 1] !== "sequence") continue;
+
+    const nodeId = tracePathToNodeId(control.parentPath, nodeIds);
+    if (!nodeId || !output.has(nodeId)) continue;
+
+    const observedIteration = typeof step.repeatIndex === "number" && step.repeatIndex > 0
+      ? step.repeatIndex
+      : (step.occurrence ?? 0) + 1;
+
+    output.set(nodeId, Math.max(output.get(nodeId) ?? 0, observedIteration));
+  }
+
+  return output;
+}
+
+function parallelBranchCoverage(
+  steps: TraceStepLike[],
+  graph: AutomationGraph,
+  executedNodeIds: Set<string>,
+): Map<string, ParallelTraceCoverage> {
+  const nodeIds = graph.nodes.map((node) => node.id);
+  const output = new Map<string, ParallelTraceCoverage>();
+
+  for (const node of graph.nodes) {
+    if (node.kind !== "parallel" || !executedNodeIds.has(node.id)) continue;
+    const totalBranches = graph.edges.filter(
+      (edge) => edge.source === node.id && /^branch \d+$/.test(edge.label ?? ""),
+    ).length;
+    output.set(node.id, { observedBranchIndexes: new Set<number>(), totalBranches });
+  }
+
+  for (const step of steps) {
+    const control = parentControlPath(step.path, "parallel");
+    if (!control) continue;
+
+    const branchIndexText = control.parts[control.tokenIndex + 1];
+    const sequenceToken = control.parts[control.tokenIndex + 2];
+    if (!/^\d+$/.test(branchIndexText ?? "") || sequenceToken !== "sequence") continue;
+
+    const nodeId = tracePathToNodeId(control.parentPath, nodeIds);
+    const coverage = nodeId ? output.get(nodeId) : undefined;
+    if (!coverage) continue;
+
+    coverage.observedBranchIndexes.add(Number(branchIndexText));
+  }
+
+  return output;
+}
+
 export function buildTraceCoverage(
   steps: TraceStepLike[],
   graph: AutomationGraph,
@@ -259,6 +347,8 @@ export function buildTraceCoverage(
   const executedNodeIds = traceNodeIds(steps.map((step) => step.path), nodeIds);
   const takenEdgeIds = traceBranchEdgeIds(steps, graph);
   const notTakenEdgeIds = new Set<string>();
+  const repeats = repeatIterationCounts(steps, graph, executedNodeIds);
+  const parallels = parallelBranchCoverage(steps, graph, executedNodeIds);
 
   const takenSources = new Set<string>();
   for (const edge of graph.edges) {
@@ -279,6 +369,29 @@ export function buildTraceCoverage(
 
   const kindByNodeId = new Map(graph.nodes.map((node) => [node.id, node.kind]));
   const executedEdgeIds = new Set<string>(takenEdgeIds);
+
+  // Parallel is not a choice: only branches that actually produced trace events
+  // are marked executed. Missing branches stay "not reached", not "not taken".
+  for (const [nodeId, coverage] of parallels) {
+    for (const branchIndex of coverage.observedBranchIndexes) {
+      const edgeId = matchingEdgeByLabel(graph, nodeId, `branch ${branchIndex + 1}`);
+      if (edgeId) executedEdgeIds.add(edgeId);
+    }
+  }
+
+  // The repeat graph is symbolic. A positive observed iteration count proves both
+  // entry into the body and a return to the repeat controller.
+  for (const [nodeId, iterationCount] of repeats) {
+    if (iterationCount <= 0) continue;
+    for (const edge of graph.edges) {
+      if (
+        (edge.source === nodeId && edge.label === "loop")
+        || (edge.target === nodeId && edge.label === "repeat")
+      ) {
+        executedEdgeIds.add(edge.id);
+      }
+    }
+  }
 
   for (const edge of graph.edges) {
     if (notTakenEdgeIds.has(edge.id)) continue;
@@ -302,5 +415,7 @@ export function buildTraceCoverage(
     executedEdgeIds,
     takenEdgeIds,
     notTakenEdgeIds,
+    repeatIterationCounts: repeats,
+    parallelBranchCoverage: parallels,
   };
 }

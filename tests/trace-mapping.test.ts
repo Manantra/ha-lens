@@ -224,4 +224,92 @@ actions:
       .map((edge) => edge.label);
     expect(notTakenLabels).toEqual(expect.arrayContaining(["true", "Option 1", "No match"]));
   });
+
+  it("reports observed repeat iterations and loop flow", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Repeat coverage
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+actions:
+  - repeat:
+      count: 3
+      sequence:
+        - action: light.toggle
+          target:
+            entity_id: light.hall
+  - action: notify.mobile_app_phone
+    data:
+      message: done
+`);
+
+    const graph = buildAutomationGraph(automation);
+    const coverage = buildTraceCoverage([
+      { path: "trigger/0" },
+      { path: "action/0" },
+      { path: "action/0/repeat/sequence/0", occurrence: 0, repeatIndex: 1 },
+      { path: "action/0/repeat/sequence/0", occurrence: 1, repeatIndex: 2 },
+      { path: "action/0/repeat/sequence/0", occurrence: 2, repeatIndex: 3 },
+      { path: "action/1" },
+    ], graph);
+
+    expect(coverage.repeatIterationCounts.get("actions.0")).toBe(3);
+
+    const executedLabels = graph.edges
+      .filter((edge) => coverage.executedEdgeIds.has(edge.id))
+      .map((edge) => edge.label)
+      .filter(Boolean);
+    expect(executedLabels).toEqual(expect.arrayContaining(["loop", "repeat", "continue"]));
+  });
+
+  it("tracks observed parallel branches without calling missing branches untaken", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Parallel coverage
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+actions:
+  - parallel:
+      - sequence:
+          - action: light.turn_on
+            target:
+              entity_id: light.one
+      - sequence:
+          - action: light.turn_on
+            target:
+              entity_id: light.two
+      - sequence:
+          - action: light.turn_on
+            target:
+              entity_id: light.three
+  - delay: "00:00:01"
+`);
+
+    const graph = buildAutomationGraph(automation);
+    const coverage = buildTraceCoverage([
+      { path: "trigger/0" },
+      { path: "action/0" },
+      { path: "action/0/parallel/0/sequence/0" },
+      { path: "action/0/parallel/2/sequence/0" },
+      { path: "action/1" },
+    ], graph);
+
+    const parallel = coverage.parallelBranchCoverage.get("actions.0");
+    expect(parallel?.totalBranches).toBe(3);
+    expect([...parallel?.observedBranchIndexes ?? []]).toEqual([0, 2]);
+
+    const branchEdges = graph.edges.filter(
+      (edge) => edge.source === "actions.0" && edge.label?.startsWith("branch "),
+    );
+    const executedBranchLabels = branchEdges
+      .filter((edge) => coverage.executedEdgeIds.has(edge.id))
+      .map((edge) => edge.label);
+    expect(executedBranchLabels).toEqual(expect.arrayContaining(["branch 1", "branch 3"]));
+    expect(executedBranchLabels).not.toContain("branch 2");
+
+    const untakenBranchLabels = branchEdges
+      .filter((edge) => coverage.notTakenEdgeIds.has(edge.id))
+      .map((edge) => edge.label);
+    expect(untakenBranchLabels).not.toContain("branch 2");
+  });
 });
