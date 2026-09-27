@@ -62,9 +62,39 @@ button.ghost { background: transparent; color: #dce3f5; }
 .explanation-list p { display: grid; grid-template-columns: 24px 1fr; gap: 8px; margin: 0; padding: 10px 12px; border: 1px solid #2a3140; border-radius: 10px; background: #151a24; color: #dce3f5; font-size: 12px; line-height: 1.55; }
 .explanation-list p > span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; background: #263146; color: #9db4ff; font-size: 10px; font-weight: 800; }
 .path-list { display: flex; flex-direction: column; gap: 8px; }
-.path-card { text-align: left; display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; background: #151a24; color: #dfe7f8; border-color: #2c3342; }
+.path-card {
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    "outcome steps"
+    "title title";
+  column-gap: 8px;
+  row-gap: 6px;
+  align-items: center;
+  background: #151a24;
+  color: #dfe7f8;
+  border-color: #2c3342;
+}
 .path-card.is-active { border-color: #6f8df5; box-shadow: 0 0 0 1px #6f8df5 inset; }
-.path-card > span:last-child { color: #77839a; font-size: 11px; }
+.path-card > .outcome { grid-area: outcome; justify-self: start; }
+.path-card > strong {
+  grid-area: title;
+  min-width: 0;
+  max-width: 100%;
+  line-height: 1.28;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.path-card > span:last-child {
+  grid-area: steps;
+  justify-self: end;
+  color: #77839a;
+  font-size: 11px;
+  white-space: nowrap;
+}
 .outcome { font-size: 9px; text-transform: uppercase; border-radius: 99px; padding: 3px 6px; background: #263146; }
 .outcome--stopped { background: #43252a; }
 .outcome--truncated { background: #463c25; }
@@ -223,14 +253,6 @@ button.ghost { background: transparent; color: #dce3f5; }
 
   .stat-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .path-card {
-    grid-template-columns: auto 1fr;
-  }
-
-  .path-card > span:last-child {
-    grid-column: 2;
   }
 
   .react-flow__minimap {
