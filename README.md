@@ -4,7 +4,7 @@
 
 HA Lens is a read-only visualizer and analyzer for Home Assistant automations. It turns automation YAML into a semantic flow graph, execution paths, entity/action inventory, structural insights, deterministic explanations, and—inside Home Assistant—a view of the latest runtime trace.
 
-> Current stable companion release: **v0.1.31**. HA Lens remains intentionally read-only: it analyzes automations but does not execute or modify them.
+> Current stable companion release: **v0.1.32**. HA Lens remains intentionally read-only: it analyzes automations but does not execute or modify them.
 
 ## Why HA Lens?
 
@@ -13,6 +13,7 @@ Visual flow editors are great for *building* automations. HA Lens is deliberatel
 - Visualize triggers, conditions, `if`, `choose`, waits, repeats, parallel blocks, scenes, scripts, device actions, and service calls.
 - Explore bounded possible execution paths without touching Home Assistant.
 - See referenced entities and actions in one place, including common Jinja helper and dotted-state references.
+- Render Home Assistant's own resolved entity icons in entity cards and directly on graph nodes, with local fallback glyphs only when Home Assistant cannot resolve an icon.
 - Click an entity to highlight its graph usage and see nested usage context.
 - Surface factual structural insights without pretending valid YAML is an error.
 - Inspect the latest Home Assistant trace with chronological runtime steps, results, errors, and graph highlighting.
@@ -83,11 +84,12 @@ The Home Assistant companion does **not** require GitHub Pages: HACS installs a 
 
 ## Roadmap
 
-The next development focus moves beyond the completed repeat/parallel trace coverage:
+The next development focus moves beyond the completed repeat/parallel trace and native icon work:
 
-- exact Home Assistant / MDI icon rendering inside the isolated viewer
 - additional runtime-label polish for deeply nested repeat/parallel combinations
-- later: read-only snapshots, automation diff visualization, and optional lint rules
+- read-only snapshots
+- automation diff visualization
+- optional lint rules
 
 See [`ROADMAP.md`](ROADMAP.md) for the detailed checklist.
 

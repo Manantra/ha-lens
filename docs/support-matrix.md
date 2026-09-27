@@ -31,7 +31,7 @@ HA Lens is a static, read-only analyzer. “Supported” means a construct is pr
 | Loaded automations | Read from Home Assistant through an admin-only WebSocket command |
 | Friendly entity names | Loaded from local state / entity registry when available |
 | Area and device names | Loaded from local registries when available |
-| Entity icons | Icon identifiers are loaded; HA Lens currently renders offline domain-aware fallback glyphs |
+| Entity icons | Home Assistant resolves the current entity icon; HA Lens renders the resulting SVG path locally in entity cards and graph nodes, with offline fallbacks when resolution is unavailable |
 | Latest automation trace | Loaded through Home Assistant's local trace WebSocket API |
 | Runtime trace steps | Chronological inspector with results/errors and graph-node mapping |
 | Trace highlighting | Mapped runtime nodes and executed flow are highlighted in the graph |
@@ -52,4 +52,3 @@ HA Lens is a static, read-only analyzer. “Supported” means a construct is pr
 - Parallel interleavings are not expanded combinatorially.
 - Path enumeration has a hard cap to keep complex automations usable.
 - Runtime trace mapping is still best-effort for unusually deep or mixed control-flow structures, but repeat iterations and parallel branch observation are now covered.
-- Exact Home Assistant / MDI icon rendering inside the isolated viewer is not implemented yet.

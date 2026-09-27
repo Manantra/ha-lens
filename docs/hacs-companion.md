@@ -9,7 +9,8 @@ The HA Lens companion is intentionally read-only.
 - Includes each automation's existing raw configuration when Home Assistant exposes it.
 - Shows a diagnostic count for readable automations and entries hidden because no usable raw configuration is available.
 - Supports filtering the automation picker by alias or entity ID.
-- Loads friendly names, areas, devices, and icon identifiers for referenced entities from Home Assistant's local registries.
+- Loads friendly names, areas and devices for referenced entities from Home Assistant's local registries.
+- Resolves entity icons through Home Assistant itself and passes only the resulting SVG path data to the isolated HA Lens viewer.
 - Loads the latest Home Assistant automation trace when available.
 - Provides a dedicated Trace inspector with chronological runtime events, result/choice/condition details, errors, and graph-node mapping.
 - Highlights mapped nodes from the latest run in the graph.
@@ -52,5 +53,5 @@ Until HA Lens is published in a default HACS catalog:
 
 - Read-only.
 - Admin-only panel.
-- Exact MDI icon rendering inside the isolated viewer is not implemented yet; HA Lens uses offline domain-aware fallback glyphs.
+- If Home Assistant cannot resolve an entity icon, HA Lens falls back to its offline domain-aware glyphs.
 - Trace-to-graph mapping is currently best-effort for deeply nested control flow; richer nested mapping and branch coverage are the next trace-focused work.

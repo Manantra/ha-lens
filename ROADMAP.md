@@ -1,6 +1,6 @@
 # HA Lens roadmap
 
-## Current stable — v0.1.31
+## Current stable — v0.1.32
 
 ### Visual inspection
 
@@ -33,34 +33,24 @@
 - [x] search / filter automation picker
 - [x] read automation config through Home Assistant's WebSocket API
 - [x] bundle the full visualizer locally for offline use
-- [x] friendly names, areas, device metadata and icon identifiers
-- [x] clearer entity metadata cards and friendly-name sorting
+- [x] friendly names, areas and device metadata
+- [x] native Home Assistant entity icon resolution and SVG rendering
+- [x] entity icons in metadata cards and graph nodes
 - [x] entity focus banner and nested usage context
-- [x] offline domain-aware entity icon fallbacks
+- [x] offline domain-aware icon fallbacks when Home Assistant cannot resolve an icon
 - [x] no write-back actions
 - [x] latest Home Assistant trace overlay
 - [x] trace inspector with chronological runtime events, results and errors
 - [x] Trace “Show full run” reliably restores the complete traced run
-
-## Next — Trace fidelity
-
 - [x] richer nested trace mapping for `choose`, `if`, repeat and parallel structures
 - [x] explicit branch coverage: executed, branch-not-taken, and not reached
 - [x] compare static structure vs. last execution
-- [x] add trace-mapping regression fixtures/tests based on real Home Assistant paths
+- [x] repeat-iteration runtime coverage
+- [x] parallel-branch runtime coverage
 
 ## Next
 
-- [x] richer repeat-iteration trace coverage
-- [x] richer parallel-branch trace coverage
-
-## Next
-
-- [ ] render exact Home Assistant / MDI entity icons inside the isolated viewer
 - [ ] improve runtime coverage labels for complex nested repeat/parallel combinations
-
-## Later
-
 - [ ] shareable read-only snapshots
 - [ ] automation diff visualization
 - [ ] optional lint rules with clearly documented semantics
