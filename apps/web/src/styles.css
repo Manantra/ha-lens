@@ -81,7 +81,13 @@ button.ghost { background: transparent; color: #dce3f5; }
 
 .lens-node { width: 250px; min-height: 88px; background: #171c26; border: 1px solid #364053; border-radius: 14px; padding: 12px 14px; box-shadow: 0 10px 28px rgba(0,0,0,.22); transition: opacity .2s, transform .2s, border-color .2s; }
 .lens-node__topline { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
-.lens-node__kind { text-transform: uppercase; letter-spacing: .1em; color: #7e8aa0; font-size: 9px; font-weight: 800; }
+.lens-node__kind-row { min-width: 0; display: flex; align-items: center; gap: 7px; }
+.lens-node__kind { flex: 0 0 auto; text-transform: uppercase; letter-spacing: .1em; color: #7e8aa0; font-size: 9px; font-weight: 800; }
+.lens-node__entity-icons { min-width: 0; display: flex; align-items: center; gap: 3px; color: #9eb4f5; }
+.lens-node__entity-icon { display: grid; place-items: center; width: 17px; height: 17px; border: 1px solid #35445f; border-radius: 5px; background: #141d2c; }
+.lens-node__entity-icon svg { width: 12px; height: 12px; fill: currentColor; }
+.lens-node__entity-icon-secondary { opacity: .5; }
+.lens-node__entity-icon-more { color: #7f8da7; font-size: 8px; font-weight: 800; }
 .lens-node__runtime-badge { flex: 0 0 auto; max-width: 112px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid #3b4658; border-radius: 999px; padding: 2px 6px; color: #a7b2c6; background: #111721; font-size: 8px; font-weight: 800; letter-spacing: .01em; text-transform: none; }
 .lens-node__runtime-badge--good { border-color: #397c55; color: #baf0cd; background: #14281c; }
 .lens-node__runtime-badge--partial { border-color: #8a6a2f; color: #e8c77e; background: #2b2314; }
@@ -629,6 +635,8 @@ button.ghost { background: transparent; color: #dce3f5; }
   width: 20px;
   height: 20px;
 }
+.entity-card__icon--ha svg { fill: currentColor; stroke: none; }
+.entity-card__icon-secondary { opacity: .5; }
 .entity-card.is-active .entity-card__icon {
   border-color: #637fd6;
   background: #202c4a;

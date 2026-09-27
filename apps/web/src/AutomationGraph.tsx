@@ -11,6 +11,15 @@ export interface TraceNodeBadge {
   tone?: "good" | "partial" | "neutral";
 }
 
+export interface GraphEntityIcon {
+  entityId: string;
+  label: string;
+  icon?: string | null;
+  path: string;
+  secondaryPath?: string | null;
+  viewBox?: string | null;
+}
+
 export function AutomationGraph({
   graph,
   highlightedNodeIds,
@@ -18,6 +27,7 @@ export function AutomationGraph({
   traceEdgeIds,
   traceNotTakenEdgeIds,
   traceNodeBadges,
+  nodeEntityIcons,
   traceCoverageActive = false,
   focusNodeIds,
   refitKey,
@@ -29,6 +39,7 @@ export function AutomationGraph({
   traceEdgeIds?: Set<string>;
   traceNotTakenEdgeIds?: Set<string>;
   traceNodeBadges?: Map<string, TraceNodeBadge>;
+  nodeEntityIcons?: Map<string, GraphEntityIcon[]>;
   traceCoverageActive?: boolean;
   focusNodeIds?: Set<string>;
   refitKey?: boolean;
@@ -111,6 +122,7 @@ export function AutomationGraph({
           ...node.data,
           runtimeBadge: runtimeBadge?.label,
           runtimeBadgeTone: runtimeBadge?.tone,
+          entityIcons: nodeEntityIcons?.get(node.id) ?? [],
         },
         className: [
           highlightedNodeIds.size && !highlightedNodeIds.has(node.id) ? "is-dimmed" : "",
@@ -119,7 +131,7 @@ export function AutomationGraph({
         ].filter(Boolean).join(" "),
       };
     }),
-    [nodes, highlightedNodeIds, structuralNodeIds, traceCoverageActive, traceNodeBadges, traceNodeIds],
+    [nodes, highlightedNodeIds, nodeEntityIcons, structuralNodeIds, traceCoverageActive, traceNodeBadges, traceNodeIds],
   );
   const displayEdges = useMemo(
     () => edges.map((edge) => {

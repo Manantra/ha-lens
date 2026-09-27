@@ -9,6 +9,7 @@ class HaLensPanel extends HTMLElement {
     this._selected = "";
     this._pendingMessage = null;
     this._registryPromise = null;
+    this._iconPathCache = new Map();
     this._automationItems = [];
     this._automationListPromise = null;
     this._diagnosticsText = "";
@@ -426,6 +427,74 @@ class HaLensPanel extends HTMLElement {
     }
   }
 
+  async _readResolvedIcon(element, timeoutMs = 2500) {
+    const started = Date.now();
+
+    while (Date.now() - started < timeoutMs) {
+      try {
+        if (element.updateComplete) await Promise.race([
+          element.updateComplete,
+          new Promise((resolve) => setTimeout(resolve, 80)),
+        ]);
+      } catch (_error) {
+        // Ignore render-cycle errors and keep polling until timeout.
+      }
+
+      const directSvg = element.shadowRoot?.querySelector("ha-svg-icon");
+      const nestedHaIcon = element.shadowRoot?.querySelector("ha-icon");
+      const nestedSvg = nestedHaIcon?.shadowRoot?.querySelector("ha-svg-icon");
+      const svgIcon = nestedSvg || directSvg;
+
+      if (svgIcon?.path) {
+        return {
+          icon: nestedHaIcon?.icon || element.icon || null,
+          path: svgIcon.path,
+          secondaryPath: svgIcon.secondaryPath || null,
+          viewBox: svgIcon.viewBox || "0 0 24 24",
+        };
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    }
+
+    return null;
+  }
+
+  async _resolveEntityIcon(state, iconOverride) {
+    const entityId = state?.entity_id || "";
+    const stateValue = state?.state || "";
+    const deviceClass = state?.attributes?.device_class || "";
+    const cacheKey = [entityId, stateValue, deviceClass, iconOverride || ""].join("|");
+    if (this._iconPathCache.has(cacheKey)) return this._iconPathCache.get(cacheKey);
+
+    let element = null;
+    if (state && customElements.get("ha-state-icon")) {
+      element = document.createElement("ha-state-icon");
+      element.stateObj = state;
+      if (iconOverride) element.icon = iconOverride;
+    } else if (iconOverride && customElements.get("ha-icon")) {
+      element = document.createElement("ha-icon");
+      element.icon = iconOverride;
+    }
+
+    if (!element) {
+      this._iconPathCache.set(cacheKey, null);
+      return null;
+    }
+
+    element.setAttribute("aria-hidden", "true");
+    element.style.cssText = "position:absolute;left:-10000px;top:-10000px;width:24px;height:24px;visibility:hidden;pointer-events:none;";
+    this.shadowRoot.append(element);
+
+    try {
+      const resolved = await this._readResolvedIcon(element);
+      this._iconPathCache.set(cacheKey, resolved);
+      return resolved;
+    } finally {
+      element.remove();
+    }
+  }
+
   async _entityMetadata(config) {
     const entityIds = this._collectEntityIds(config);
     const { areas, devices, entities } = await this._registryData();
@@ -448,10 +517,16 @@ class HaLensPanel extends HTMLElement {
       const areaId = registry?.area_id || device?.area_id;
       const area = areaId ? areasById.get(areaId) : null;
 
+      const iconOverride = registry?.icon || state?.attributes?.icon || null;
+      const resolvedIcon = await this._resolveEntityIcon(state, iconOverride);
+
       metadata[entityId] = {
         entityId: resolvedEntityId,
         name: registry?.name || state?.attributes?.friendly_name || registry?.original_name || resolvedEntityId || entityId,
-        icon: registry?.icon || state?.attributes?.icon || null,
+        icon: resolvedIcon?.icon || iconOverride,
+        iconPath: resolvedIcon?.path || null,
+        iconSecondaryPath: resolvedIcon?.secondaryPath || null,
+        iconViewBox: resolvedIcon?.viewBox || null,
         area: area?.name || null,
         device: device?.name_by_user || device?.name || null,
       };

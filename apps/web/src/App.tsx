@@ -6,7 +6,7 @@ import { parseAutomationYaml, serializeAutomationYaml } from "@ha-lens/parser";
 import { enumerateExecutionPaths } from "@ha-lens/paths";
 import type { ExecutionPath } from "@ha-lens/model";
 import { exportAutomationGraph, type GraphExportFormat } from "./exportGraph";
-import { AutomationGraph, type TraceNodeBadge } from "./AutomationGraph";
+import { AutomationGraph, type GraphEntityIcon, type TraceNodeBadge } from "./AutomationGraph";
 import {
   buildTraceSemanticLabels,
   buildTraceCoverage,
@@ -22,6 +22,9 @@ interface CompanionEntityMetadata {
   entityId?: string | null;
   name?: string | null;
   icon?: string | null;
+  iconPath?: string | null;
+  iconSecondaryPath?: string | null;
+  iconViewBox?: string | null;
   area?: string | null;
   device?: string | null;
 }
@@ -77,11 +80,34 @@ function formatTraceTime(value?: string | null): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
-function EntityIcon({ entityId, icon }: { entityId: string; icon?: string | null }) {
+function EntityIcon({
+  entityId,
+  icon,
+  iconPath,
+  iconSecondaryPath,
+  iconViewBox,
+}: {
+  entityId: string;
+  icon?: string | null;
+  iconPath?: string | null;
+  iconSecondaryPath?: string | null;
+  iconViewBox?: string | null;
+}) {
   const domain = entityId.split(".", 1)[0];
   const hint = `${icon || ""} ${domain}`.toLowerCase();
-  const common = { viewBox: "0 0 24 24", "aria-hidden": true } as const;
 
+  if (iconPath) {
+    return (
+      <span className="entity-card__icon entity-card__icon--ha" title={icon || `${domain} entity`}>
+        <svg viewBox={iconViewBox || "0 0 24 24"} aria-hidden="true">
+          <path d={iconPath} />
+          {iconSecondaryPath && <path className="entity-card__icon-secondary" d={iconSecondaryPath} />}
+        </svg>
+      </span>
+    );
+  }
+
+  const common = { viewBox: "0 0 24 24", "aria-hidden": true } as const;
   let glyph;
   if (/motion|occupancy|presence|binary_sensor/.test(hint)) {
     glyph = <><circle cx="12" cy="12" r="2.2" /><path d="M7.5 8.2a6 6 0 0 0 0 7.6M16.5 8.2a6 6 0 0 1 0 7.6M4.5 5.7a10 10 0 0 0 0 12.6M19.5 5.7a10 10 0 0 1 0 12.6" /></>;
@@ -258,6 +284,35 @@ export function App() {
     });
   }, [entityMetadata, result]);
 
+  const graphNodeEntityIcons = useMemo(() => {
+    const icons = new Map<string, GraphEntityIcon[]>();
+    if (!result.ok) return icons;
+
+    for (const entityId of result.analysis.entities) {
+      const metadata = entityMetadata[entityId];
+      if (!metadata?.iconPath) continue;
+
+      const icon: GraphEntityIcon = {
+        entityId: metadata.entityId || entityId,
+        label: metadata.name || metadata.entityId || entityId,
+        icon: metadata.icon || null,
+        path: metadata.iconPath,
+        secondaryPath: metadata.iconSecondaryPath || null,
+        viewBox: metadata.iconViewBox || "0 0 24 24",
+      };
+
+      for (const nodeId of result.analysis.entityUsages[entityId] ?? []) {
+        const current = icons.get(nodeId) ?? [];
+        if (!current.some((item) => item.entityId === icon.entityId)) {
+          current.push(icon);
+          icons.set(nodeId, current);
+        }
+      }
+    }
+
+    return icons;
+  }, [entityMetadata, result]);
+
   const entityFocus = useMemo(() => {
     if (!result.ok || !selectedEntity) return null;
     const metadata = entityMetadata[selectedEntity];
@@ -309,7 +364,7 @@ export function App() {
             <button onClick={() => setPresentation(false)}>Exit presentation</button>
           </div>
         </header>
-        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} traceNotTakenEdgeIds={traceNotTakenEdgeIds} traceNodeBadges={traceNodeBadges} traceCoverageActive={Boolean(trace && showTrace)} focusNodeIds={entityFocusNodeIds} fitMode={graphFitMode} /></div>
+        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} traceNotTakenEdgeIds={traceNotTakenEdgeIds} traceNodeBadges={traceNodeBadges} nodeEntityIcons={graphNodeEntityIcons} traceCoverageActive={Boolean(trace && showTrace)} focusNodeIds={entityFocusNodeIds} fitMode={graphFitMode} /></div>
       </main>
     );
   }
@@ -428,7 +483,7 @@ export function App() {
                   <span><i className="run-coverage-dot is-not-reached" />Not reached</span>
                 </div>
               )}
-              {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} traceNotTakenEdgeIds={traceNotTakenEdgeIds} traceNodeBadges={traceNodeBadges} traceCoverageActive={Boolean(trace && showTrace)} focusNodeIds={entityFocusNodeIds} refitKey={yamlCollapsed} fitMode={graphFitMode} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
+              {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} traceNotTakenEdgeIds={traceNotTakenEdgeIds} traceNodeBadges={traceNodeBadges} nodeEntityIcons={graphNodeEntityIcons} traceCoverageActive={Boolean(trace && showTrace)} focusNodeIds={entityFocusNodeIds} refitKey={yamlCollapsed} fitMode={graphFitMode} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
             </div>
           </div>
         </section>
@@ -509,7 +564,13 @@ export function App() {
                           setSelectedEntity(focused ? null : entity);
                         }}
                       >
-                        <EntityIcon entityId={metadata?.entityId || entity} icon={metadata?.icon} />
+                        <EntityIcon
+                          entityId={metadata?.entityId || entity}
+                          icon={metadata?.icon}
+                          iconPath={metadata?.iconPath}
+                          iconSecondaryPath={metadata?.iconSecondaryPath}
+                          iconViewBox={metadata?.iconViewBox}
+                        />
                         <span className="entity-card__main">
                           <span className="entity-card__title-row">
                             <strong>{displayName}</strong>
