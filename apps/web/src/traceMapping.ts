@@ -84,7 +84,8 @@ function traceCandidates(path: string): string[] {
     rootOnly,
     ...inlineConditionVariants(rootOnly),
   ];
-  return [...new Set(variants.flatMap(candidateIds))];
+  return [...new Set(variants.flatMap(candidateIds))]
+    .sort((left, right) => right.split(".").length - left.split(".").length);
 }
 
 function resolveTracePath(path: string, ids: Iterable<string>): string | null {
