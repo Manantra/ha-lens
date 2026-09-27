@@ -4,7 +4,7 @@
 
 HA Lens is a read-only visualizer and analyzer for Home Assistant automations. It turns automation YAML into a semantic flow graph, execution paths, entity/action inventory, structural insights, deterministic explanations, and—inside Home Assistant—a view of the latest runtime trace.
 
-> Current stable companion release: **v0.1.30**. HA Lens remains intentionally read-only: it analyzes automations but does not execute or modify them.
+> Current stable companion release: **v0.1.31**. HA Lens remains intentionally read-only: it analyzes automations but does not execute or modify them.
 
 ## Why HA Lens?
 
@@ -17,6 +17,7 @@ Visual flow editors are great for *building* automations. HA Lens is deliberatel
 - Surface factual structural insights without pretending valid YAML is an error.
 - Inspect the latest Home Assistant trace with chronological runtime steps, results, errors, and graph highlighting.
 - Switch between **Structure** and **Last run** to see executed flow, explicit branch-not-taken decisions, and parts of the graph that were not reached.
+- See observed repeat iteration counts (for example **3 iterations**) and observed parallel branch coverage (for example **3/3 branches**) from the latest Home Assistant trace.
 - Collapse the Automation YAML panel when a large graph needs more room.
 - Switch between **Fit all** for overview and **Fit width** for larger, more readable nodes.
 - Export the current automation map as SVG or high-resolution PNG.
@@ -82,11 +83,11 @@ The Home Assistant companion does **not** require GitHub Pages: HACS installs a 
 
 ## Roadmap
 
-The next development focus remains trace fidelity around the harder runtime constructs:
+The next development focus moves beyond the completed repeat/parallel trace coverage:
 
-- richer repeat-iteration coverage
-- richer parallel-branch coverage
-- later: exact MDI icons, read-only snapshots, automation diff visualization, and optional lint rules
+- exact Home Assistant / MDI icon rendering inside the isolated viewer
+- additional runtime-label polish for deeply nested repeat/parallel combinations
+- later: read-only snapshots, automation diff visualization, and optional lint rules
 
 See [`ROADMAP.md`](ROADMAP.md) for the detailed checklist.
 

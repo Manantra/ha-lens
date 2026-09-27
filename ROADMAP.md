@@ -1,6 +1,6 @@
 # HA Lens roadmap
 
-## Current stable — v0.1.30
+## Current stable — v0.1.31
 
 ### Visual inspection
 
@@ -51,12 +51,16 @@
 
 ## Next
 
-- [ ] richer repeat-iteration trace coverage
-- [ ] richer parallel-branch trace coverage
+- [x] richer repeat-iteration trace coverage
+- [x] richer parallel-branch trace coverage
+
+## Next
+
+- [ ] render exact Home Assistant / MDI entity icons inside the isolated viewer
+- [ ] improve runtime coverage labels for complex nested repeat/parallel combinations
 
 ## Later
 
-- [ ] render exact Home Assistant / MDI entity icons inside the isolated viewer
 - [ ] shareable read-only snapshots
 - [ ] automation diff visualization
 - [ ] optional lint rules with clearly documented semantics
