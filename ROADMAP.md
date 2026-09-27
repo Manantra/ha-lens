@@ -1,6 +1,6 @@
 # HA Lens roadmap
 
-## Current stable — v0.1.28
+## Current stable — v0.1.30
 
 ### Visual inspection
 
@@ -44,10 +44,15 @@
 
 ## Next — Trace fidelity
 
-- [ ] richer nested trace mapping for `choose`, `if`, repeat and parallel structures
-- [ ] explicit branch coverage: executed, evaluated-but-not-taken, and not reached
-- [ ] compare static structure vs. last execution
-- [ ] add trace-mapping regression fixtures/tests based on real Home Assistant paths
+- [x] richer nested trace mapping for `choose`, `if`, repeat and parallel structures
+- [x] explicit branch coverage: executed, branch-not-taken, and not reached
+- [x] compare static structure vs. last execution
+- [x] add trace-mapping regression fixtures/tests based on real Home Assistant paths
+
+## Next
+
+- [ ] richer repeat-iteration trace coverage
+- [ ] richer parallel-branch trace coverage
 
 ## Later
 

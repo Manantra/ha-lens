@@ -34,7 +34,9 @@ HA Lens is a static, read-only analyzer. “Supported” means a construct is pr
 | Entity icons | Icon identifiers are loaded; HA Lens currently renders offline domain-aware fallback glyphs |
 | Latest automation trace | Loaded through Home Assistant's local trace WebSocket API |
 | Runtime trace steps | Chronological inspector with results/errors and graph-node mapping |
-| Trace highlighting | Mapped runtime nodes are highlighted in the graph |
+| Trace highlighting | Mapped runtime nodes and executed flow are highlighted in the graph |
+| Structure vs. Last run | Toggle between the complete static graph and conservative runtime coverage |
+| Branch coverage | Explicitly taken branches are green; sibling branch edges known not to be taken are orange/dashed; unreached graph elements are dimmed |
 | YAML panel | Can be hidden to give the graph more space |
 | Graph fitting | `Fit all` overview and optional `Fit width` detail mode |
 | Write-back | Not implemented; the integration remains read-only |
@@ -47,5 +49,5 @@ HA Lens is a static, read-only analyzer. “Supported” means a construct is pr
 - Loop iteration counts are not guessed when they depend on runtime state.
 - Parallel interleavings are not expanded combinatorially.
 - Path enumeration has a hard cap to keep complex automations usable.
-- Runtime trace mapping is best-effort; richer mapping of deeply nested branches, repeats and parallel structures is the next trace-focused work.
+- Runtime trace mapping is best-effort; repeat iterations and complex parallel execution remain the main trace-fidelity areas for future work.
 - Exact Home Assistant / MDI icon rendering inside the isolated viewer is not implemented yet.
