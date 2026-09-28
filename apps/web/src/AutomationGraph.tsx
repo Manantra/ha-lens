@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Background, Controls, MiniMap, ReactFlow, type Edge, type Node, type ReactFlowInstance } from "@xyflow/react";
 import type { AutomationGraph as AutomationGraphModel } from "@ha-lens/model";
+import type { DiffStatus } from "./automationDiff";
 import { LensNode } from "./LensNode";
 import { layoutGraph } from "./layout";
 
@@ -28,6 +29,9 @@ export function AutomationGraph({
   traceNotTakenEdgeIds,
   traceNodeBadges,
   nodeEntityIcons,
+  diffNodeStates,
+  diffEdgeStates,
+  diffActive = false,
   traceCoverageActive = false,
   focusNodeIds,
   refitKey,
@@ -40,6 +44,9 @@ export function AutomationGraph({
   traceNotTakenEdgeIds?: Set<string>;
   traceNodeBadges?: Map<string, TraceNodeBadge>;
   nodeEntityIcons?: Map<string, GraphEntityIcon[]>;
+  diffNodeStates?: Map<string, DiffStatus>;
+  diffEdgeStates?: Map<string, DiffStatus>;
+  diffActive?: boolean;
   traceCoverageActive?: boolean;
   focusNodeIds?: Set<string>;
   refitKey?: boolean;
@@ -115,6 +122,7 @@ export function AutomationGraph({
         && !structuralNodeIds.has(node.id);
 
       const runtimeBadge = traceCoverageActive ? traceNodeBadges?.get(node.id) : undefined;
+      const diffStatus = diffActive ? diffNodeStates?.get(node.id) : undefined;
 
       return {
         ...node,
@@ -123,21 +131,24 @@ export function AutomationGraph({
           runtimeBadge: runtimeBadge?.label,
           runtimeBadgeTone: runtimeBadge?.tone,
           entityIcons: nodeEntityIcons?.get(node.id) ?? [],
+          diffStatus,
         },
         className: [
           highlightedNodeIds.size && !highlightedNodeIds.has(node.id) ? "is-dimmed" : "",
           executed ? "is-traced is-run-executed" : "",
           notReached ? "is-run-not-reached" : "",
+          diffStatus ? `is-diff-${diffStatus}` : "",
         ].filter(Boolean).join(" "),
       };
     }),
-    [nodes, highlightedNodeIds, nodeEntityIcons, structuralNodeIds, traceCoverageActive, traceNodeBadges, traceNodeIds],
+    [nodes, diffActive, diffNodeStates, highlightedNodeIds, nodeEntityIcons, structuralNodeIds, traceCoverageActive, traceNodeBadges, traceNodeIds],
   );
   const displayEdges = useMemo(
     () => edges.map((edge) => {
       const executed = traceCoverageActive && Boolean(traceEdgeIds?.has(edge.id));
       const notTaken = traceCoverageActive && Boolean(traceNotTakenEdgeIds?.has(edge.id));
       const notReached = traceCoverageActive && !executed && !notTaken;
+      const diffStatus = diffActive ? diffEdgeStates?.get(edge.id) : undefined;
 
       return {
         ...edge,
@@ -146,10 +157,11 @@ export function AutomationGraph({
           executed ? "is-traced is-run-executed" : "",
           notTaken ? "is-run-not-taken" : "",
           notReached ? "is-run-not-reached" : "",
+          diffStatus ? `is-diff-${diffStatus}` : "",
         ].filter(Boolean).join(" "),
       };
     }),
-    [edges, highlightedNodeIds, traceCoverageActive, traceEdgeIds, traceNotTakenEdgeIds],
+    [diffActive, diffEdgeStates, edges, highlightedNodeIds, traceCoverageActive, traceEdgeIds, traceNotTakenEdgeIds],
   );
 
   return (

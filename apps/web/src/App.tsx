@@ -14,8 +14,9 @@ import {
   tracePathToSemanticId,
 } from "./traceMapping";
 import { sampleAutomation } from "./sample";
+import { buildAutomationDiff } from "./automationDiff";
 
-type Tab = "summary" | "paths" | "entities" | "trace" | "insights" | "explain";
+type Tab = "summary" | "paths" | "entities" | "diff" | "trace" | "insights" | "explain";
 type GraphFitMode = "all" | "width";
 
 interface CompanionEntityMetadata {
@@ -134,6 +135,7 @@ function EntityIcon({
 
 export function App() {
   const [yaml, setYaml] = useState(sampleAutomation);
+  const [baselineYaml, setBaselineYaml] = useState(sampleAutomation);
   const [tab, setTab] = useState<Tab>("summary");
   const [selectedPath, setSelectedPath] = useState<ExecutionPath | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
@@ -146,6 +148,7 @@ export function App() {
   const [trace, setTrace] = useState<CompanionTrace | null>(null);
   const [showTrace, setShowTrace] = useState(false);
   const [selectedTraceNodeId, setSelectedTraceNodeId] = useState<string | null>(null);
+  const [selectedDiffNodeId, setSelectedDiffNodeId] = useState<string | null>(null);
   const embedded = useMemo(() => new URLSearchParams(window.location.search).get("embedded") === "1", []);
 
   useEffect(() => {
@@ -171,13 +174,16 @@ export function App() {
       };
       if (message.type !== "ha-lens:automation" || !message.config || typeof message.config !== "object") return;
 
-      setYaml(serializeAutomationYaml(message.config));
+      const source = serializeAutomationYaml(message.config);
+      setYaml(source);
+      setBaselineYaml(source);
       setEntityMetadata(message.entityMetadata && typeof message.entityMetadata === "object" ? message.entityMetadata : {});
       setTrace(message.trace && typeof message.trace === "object" ? message.trace : null);
       setShowTrace(Boolean(message.trace));
       setSelectedPath(null);
       setSelectedEntity(null);
       setSelectedTraceNodeId(null);
+      setSelectedDiffNodeId(null);
       setTab("summary");
     };
 
@@ -200,6 +206,36 @@ export function App() {
     }
   }, [yaml]);
 
+  const baselineResult = useMemo(() => {
+    try {
+      const parsed = parseAutomationYaml(baselineYaml);
+      return {
+        ok: true as const,
+        ...parsed,
+        graph: buildAutomationGraph(parsed.automation),
+      };
+    } catch (error) {
+      return {
+        ok: false as const,
+        error: error instanceof Error ? error.message : "Unable to parse baseline YAML",
+      };
+    }
+  }, [baselineYaml]);
+
+  const automationDiff = useMemo(
+    () => result.ok && baselineResult.ok
+      ? buildAutomationDiff(
+          baselineResult.automation,
+          result.automation,
+          baselineResult.graph,
+          result.graph,
+        )
+      : null,
+    [baselineResult, result],
+  );
+
+  const diffActive = tab === "diff" && Boolean(automationDiff);
+
   const entityFocusNodeIds = useMemo(
     () => selectedEntity && result.ok
       ? new Set(result.analysis.entityUsages[selectedEntity] ?? [])
@@ -208,10 +244,11 @@ export function App() {
   );
 
   const highlightedNodeIds = useMemo(() => {
+    if (diffActive && selectedDiffNodeId) return new Set([selectedDiffNodeId]);
     if (selectedTraceNodeId) return new Set([selectedTraceNodeId]);
     if (entityFocusNodeIds.size) return entityFocusNodeIds;
     return new Set(selectedPath?.steps.map((step) => step.nodeId) ?? []);
-  }, [entityFocusNodeIds, selectedPath, selectedTraceNodeId]);
+  }, [diffActive, entityFocusNodeIds, selectedDiffNodeId, selectedPath, selectedTraceNodeId]);
 
   const traceCoverage = useMemo(
     () => result.ok && trace
@@ -270,8 +307,8 @@ export function App() {
 
   const tabs = useMemo<Tab[]>(
     () => trace
-      ? ["summary", "paths", "entities", "trace", "insights", "explain"]
-      : ["summary", "paths", "entities", "insights", "explain"],
+      ? ["summary", "paths", "entities", "diff", "trace", "insights", "explain"]
+      : ["summary", "paths", "entities", "diff", "insights", "explain"],
     [trace],
   );
 
@@ -377,7 +414,7 @@ export function App() {
           <div className="tagline">See what your Home Assistant automation can do.</div>
         </div>
         <div className="topbar__actions">
-          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setEntityMetadata({}); setTrace(null); setShowTrace(false); setSelectedTraceNodeId(null); }}>Load example</button>
+          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setBaselineYaml(sampleAutomation); setEntityMetadata({}); setTrace(null); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); }}>Load example</button>
           <button className="ghost" disabled={!result.ok} onClick={() => void copyMermaid()}>{copyStatus === "copied" ? "Mermaid copied ✓" : copyStatus === "failed" ? "Copy failed" : "Copy Mermaid"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("svg")}>{exporting === "svg" ? "Exporting…" : "Export SVG"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
@@ -400,7 +437,7 @@ export function App() {
               </button>
             </div>
           </div>
-          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setTrace(null); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
+          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setTrace(null); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
         </aside>
 
         <section className="graph-panel panel">
@@ -476,14 +513,36 @@ export function App() {
               </div>
             )}
             <div className="graph-canvas">
-              {trace && showTrace && result.ok && (
+              {diffActive && automationDiff && (
+                <div className="diff-legend" aria-label="Automation diff legend">
+                  <span><i className="diff-dot is-added" />Added</span>
+                  <span><i className="diff-dot is-changed" />Changed</span>
+                  <span><i className="diff-dot is-removed" />Removed</span>
+                </div>
+              )}
+              {trace && showTrace && result.ok && !diffActive && (
                 <div className="run-coverage-legend" aria-label="Last run coverage legend">
                   <span><i className="run-coverage-dot is-executed" />Executed</span>
                   <span><i className="run-coverage-line is-not-taken" />Branch not taken</span>
                   <span><i className="run-coverage-dot is-not-reached" />Not reached</span>
                 </div>
               )}
-              {result.ok ? <AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} traceNotTakenEdgeIds={traceNotTakenEdgeIds} traceNodeBadges={traceNodeBadges} nodeEntityIcons={graphNodeEntityIcons} traceCoverageActive={Boolean(trace && showTrace)} focusNodeIds={entityFocusNodeIds} refitKey={yamlCollapsed} fitMode={graphFitMode} /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
+              {result.ok ? <AutomationGraph
+                graph={diffActive && automationDiff ? automationDiff.graph : result.graph}
+                highlightedNodeIds={highlightedNodeIds}
+                traceNodeIds={tracedNodeIds}
+                traceEdgeIds={tracedEdgeIds}
+                traceNotTakenEdgeIds={traceNotTakenEdgeIds}
+                traceNodeBadges={traceNodeBadges}
+                nodeEntityIcons={graphNodeEntityIcons}
+                traceCoverageActive={Boolean(trace && showTrace && !diffActive)}
+                diffNodeStates={diffActive && automationDiff ? automationDiff.nodeStates : undefined}
+                diffEdgeStates={diffActive && automationDiff ? automationDiff.edgeStates : undefined}
+                diffActive={diffActive}
+                focusNodeIds={entityFocusNodeIds}
+                refitKey={yamlCollapsed || diffActive}
+                fitMode={graphFitMode}
+              /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
             </div>
           </div>
         </section>
@@ -496,7 +555,12 @@ export function App() {
                 className={tab === item ? "is-active" : ""}
                 onClick={() => {
                   if (item === "trace") setShowTrace(true);
+                  if (item === "diff") {
+                    setSelectedPath(null);
+                    setSelectedEntity(null);
+                  }
                   setSelectedTraceNodeId(null);
+                  setSelectedDiffNodeId(null);
                   setTab(item);
                 }}
               >
@@ -616,6 +680,78 @@ export function App() {
                     : <div className="empty-state">No service actions found.</div>}
                 </div>
               </>
+            ) : tab === "diff" ? (
+              <div className="diff-inspector">
+                <div className="diff-header">
+                  <div>
+                    <h3>Automation Diff</h3>
+                    <p>Baseline: {baselineResult.ok ? baselineResult.automation.alias : "invalid baseline"}</p>
+                  </div>
+                  <button
+                    className="ghost diff-baseline-button"
+                    disabled={!result.ok}
+                    onClick={() => {
+                      setBaselineYaml(yaml);
+                      setSelectedDiffNodeId(null);
+                    }}
+                    title="Use the current local YAML as the new comparison baseline"
+                  >
+                    Set current as baseline
+                  </button>
+                </div>
+                <div className="section-intro">
+                  The loaded Home Assistant version is captured automatically as the baseline. Edit or paste YAML locally to compare it without writing anything back.
+                </div>
+                {!baselineResult.ok ? (
+                  <div className="notice">Baseline YAML could not be parsed: {baselineResult.error}</div>
+                ) : automationDiff ? (
+                  <>
+                    <div className="diff-stat-grid">
+                      <div className="diff-stat diff-stat--added"><strong>{automationDiff.stats.added}</strong><span>Added</span></div>
+                      <div className="diff-stat diff-stat--changed"><strong>{automationDiff.stats.changed}</strong><span>Changed</span></div>
+                      <div className="diff-stat diff-stat--removed"><strong>{automationDiff.stats.removed}</strong><span>Removed</span></div>
+                      <div className="diff-stat"><strong>{automationDiff.stats.unchanged}</strong><span>Unchanged</span></div>
+                    </div>
+                    {automationDiff.hasChanges ? (
+                      <div className="diff-change-list">
+                        {automationDiff.changes.map((change) => {
+                          const selected = Boolean(change.graphNodeId && selectedDiffNodeId === change.graphNodeId);
+                          return (
+                            <button
+                              key={change.key}
+                              className={`diff-change diff-change--${change.status} ${selected ? "is-active" : ""}`}
+                              disabled={!change.graphNodeId}
+                              onClick={() => {
+                                if (!change.graphNodeId) return;
+                                setSelectedDiffNodeId(selected ? null : change.graphNodeId);
+                              }}
+                            >
+                              <span className={`diff-change__status diff-change__status--${change.status}`}>{change.status}</span>
+                              <span className="diff-change__body">
+                                <strong>{change.label}</strong>
+                                <small>{change.kind}{change.detail ? ` · ${change.detail}` : ""}</small>
+                                {change.beforeLabel && change.afterLabel && change.beforeLabel !== change.afterLabel && (
+                                  <span className="diff-change__transition">
+                                    <span>{change.beforeLabel}</span>
+                                    <b>→</b>
+                                    <span>{change.afterLabel}</span>
+                                  </span>
+                                )}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="diff-empty">
+                        <strong>No changes</strong>
+                        <span>The current YAML matches the captured baseline.</span>
+                      </div>
+                    )}
+                    <p className="privacy">Diffing happens entirely in your browser. Removed baseline nodes are shown only in the Diff graph and are never written to Home Assistant.</p>
+                  </>
+                ) : null}
+              </div>
             ) : tab === "trace" && trace ? (
               <div className="trace-inspector">
                 <div className="trace-overview">

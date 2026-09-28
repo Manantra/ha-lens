@@ -1,11 +1,13 @@
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { GraphNode } from "@ha-lens/model";
 import type { GraphEntityIcon } from "./AutomationGraph";
+import type { DiffStatus } from "./automationDiff";
 
 type LensNodeData = GraphNode & {
   runtimeBadge?: string;
   runtimeBadgeTone?: "good" | "partial" | "neutral";
   entityIcons?: GraphEntityIcon[];
+  diffStatus?: DiffStatus;
 };
 
 function NodeEntityIcons({ icons }: { icons: GraphEntityIcon[] }) {
@@ -44,14 +46,21 @@ export function LensNode({ data, selected }: NodeProps) {
           <div className="lens-node__kind">{node.kind}</div>
           <NodeEntityIcons icons={entityIcons} />
         </div>
-        {node.runtimeBadge && (
-          <div
-            className={`lens-node__runtime-badge lens-node__runtime-badge--${node.runtimeBadgeTone || "neutral"}`}
-            title="Observed in the latest Home Assistant run"
-          >
-            {node.runtimeBadge}
-          </div>
-        )}
+        <div className="lens-node__badges">
+          {node.diffStatus && (
+            <div className={`lens-node__diff-badge lens-node__diff-badge--${node.diffStatus}`}>
+              {node.diffStatus === "added" ? "+ added" : node.diffStatus === "removed" ? "− removed" : "~ changed"}
+            </div>
+          )}
+          {node.runtimeBadge && (
+            <div
+              className={`lens-node__runtime-badge lens-node__runtime-badge--${node.runtimeBadgeTone || "neutral"}`}
+              title="Observed in the latest Home Assistant run"
+            >
+              {node.runtimeBadge}
+            </div>
+          )}
+        </div>
       </div>
       <div className="lens-node__label">{node.label}</div>
       {node.subtitle && <div className="lens-node__subtitle">{node.subtitle}</div>}
