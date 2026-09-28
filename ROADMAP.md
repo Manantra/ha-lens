@@ -1,6 +1,6 @@
 # HA Lens roadmap
 
-## Current stable — v0.1.32
+## Current stable — v0.1.34
 
 ### Visual inspection
 
@@ -52,5 +52,5 @@
 
 - [ ] improve runtime coverage labels for complex nested repeat/parallel combinations
 - [ ] shareable read-only snapshots
-- [ ] automation diff visualization
+- [x] automation diff visualization
 - [ ] optional lint rules with clearly documented semantics

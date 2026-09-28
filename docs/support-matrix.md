@@ -41,12 +41,14 @@ HA Lens is a static, read-only analyzer. “Supported” means a construct is pr
 | Parallel runtime coverage | Parallel nodes show observed/configured branch counts; only branches actually present in the Home Assistant trace are marked executed |
 | YAML panel | Can be hidden to give the graph more space |
 | Graph fitting | `Fit all` overview and optional `Fit width` detail mode |
+| Automation diff | The loaded automation is captured locally as a baseline; local YAML edits can be compared as added / changed / removed graph nodes without write-back |
+| Diff baseline reset | The current local YAML can be promoted to a new in-browser baseline at any time |
 | Write-back | Not implemented; the integration remains read-only |
 
 ## Deliberate limitations
 
 - No action is ever executed by HA Lens.
-- HA Lens does not modify automation YAML.
+- HA Lens does not modify automation YAML in Home Assistant. The editor and Diff baseline are local browser state only.
 - Templates are not evaluated against Home Assistant state.
 - Loop iteration counts are not guessed when they depend on runtime state.
 - Parallel interleavings are not expanded combinatorially.

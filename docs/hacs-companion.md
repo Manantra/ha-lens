@@ -16,6 +16,7 @@ The HA Lens companion is intentionally read-only.
 - Highlights mapped nodes from the latest run in the graph.
 - Lets the YAML panel be collapsed for more graph space.
 - Provides **Fit all** and **Fit width** graph viewport modes.
+- Captures the selected Home Assistant automation as a local Diff baseline and compares local YAML edits as added / changed / removed without registering any write command.
 - Passes only the selected automation configuration, referenced-entity metadata, and compact trace data to the bundled viewer.
 - Does not register any write action and does not modify automation YAML.
 
@@ -54,4 +55,4 @@ Until HA Lens is published in a default HACS catalog:
 - Read-only.
 - Admin-only panel.
 - If Home Assistant cannot resolve an entity icon, HA Lens falls back to its offline domain-aware glyphs.
-- Trace-to-graph mapping is currently best-effort for deeply nested control flow; richer nested mapping and branch coverage are the next trace-focused work.
+- Trace-to-graph mapping remains best-effort for unusually deep or mixed control flow.

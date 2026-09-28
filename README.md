@@ -4,7 +4,7 @@
 
 HA Lens is a read-only visualizer and analyzer for Home Assistant automations. It turns automation YAML into a semantic flow graph, execution paths, entity/action inventory, structural insights, deterministic explanations, and—inside Home Assistant—a view of the latest runtime trace.
 
-> Current stable companion release: **v0.1.32**. HA Lens remains intentionally read-only: it analyzes automations but does not execute or modify them.
+> Current stable companion release: **v0.1.34**. HA Lens remains intentionally read-only: it analyzes automations but does not execute or modify them.
 
 ## Why HA Lens?
 
@@ -18,6 +18,7 @@ Visual flow editors are great for *building* automations. HA Lens is deliberatel
 - Surface factual structural insights without pretending valid YAML is an error.
 - Inspect the latest Home Assistant trace with chronological runtime steps, results, errors, and graph highlighting.
 - Switch between **Structure** and **Last run** to see executed flow, explicit branch-not-taken decisions, and parts of the graph that were not reached.
+- Compare the current local YAML against a captured baseline in the **Diff** tab: added, changed, and removed nodes are shown both in a change list and directly in the graph. Removed baseline nodes remain visible only for comparison.
 - See observed repeat iteration counts (for example **3 iterations**) and observed parallel branch coverage (for example **3/3 branches**) from the latest Home Assistant trace.
 - Collapse the Automation YAML panel when a large graph needs more room.
 - Switch between **Fit all** for overview and **Fit width** for larger, more readable nodes.
@@ -88,7 +89,6 @@ The next development focus moves beyond the completed repeat/parallel trace and 
 
 - additional runtime-label polish for deeply nested repeat/parallel combinations
 - read-only snapshots
-- automation diff visualization
 - optional lint rules
 
 See [`ROADMAP.md`](ROADMAP.md) for the detailed checklist.
