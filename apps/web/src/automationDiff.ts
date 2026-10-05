@@ -63,10 +63,22 @@ function canonical(value: unknown): string {
   return JSON.stringify(value) ?? String(value);
 }
 
-function entityHint(raw: UnknownRecord): string {
+function targetHint(raw: UnknownRecord): string {
   const target = isRecord(raw.target) ? raw.target : {};
-  const value = target.entity_id ?? raw.entity_id ?? raw.device_id ?? "";
-  return canonical(value);
+  const keys = ["entity_id", "device_id", "area_id", "floor_id", "label_id"];
+  return canonical(Object.fromEntries(
+    keys.flatMap((key) => {
+      const value = target[key] ?? raw[key];
+      return value == null ? [] : [[key, value]];
+    }),
+  ));
+}
+
+function normalizedTriggerRaw(raw: UnknownRecord): UnknownRecord {
+  if (typeof raw.id !== "string" || !raw.id.startsWith("generated-")) return raw;
+  const normalized = { ...raw };
+  delete normalized.id;
+  return normalized;
 }
 
 function conditionIdentity(node: ConditionNode): string {
@@ -74,25 +86,23 @@ function conditionIdentity(node: ConditionNode): string {
     "condition",
     node.conditionType,
     node.alias || "",
-    entityHint(node.raw),
+    targetHint(node.raw),
   ].join("|");
 }
 
 function triggerIdentity(node: TriggerNode): string {
-  const explicitId = typeof node.raw.id === "string" ? node.raw.id : "";
   return [
     "trigger",
     node.triggerType,
-    explicitId,
     node.alias || "",
-    entityHint(node.raw),
+    targetHint(node.raw),
   ].join("|");
 }
 
 function sequenceIdentity(node: SequenceItem): string {
   switch (node.kind) {
     case "service":
-      return ["service", node.action, node.alias || "", entityHint(node.raw)].join("|");
+      return ["service", node.action, node.alias || "", targetHint(node.raw)].join("|");
     case "device-action":
       return ["device", node.domain, node.actionType, node.alias || "", node.entityId || "", node.deviceId || ""].join("|");
     case "inline-condition":
@@ -105,6 +115,12 @@ function sequenceIdentity(node: SequenceItem): string {
       return ["repeat", node.repeatType, node.alias || ""].join("|");
     case "parallel":
       return ["parallel", node.alias || ""].join("|");
+    case "sequence":
+      return ["sequence", node.alias || ""].join("|");
+    case "event":
+      return ["event", node.eventType, node.alias || ""].join("|");
+    case "conversation-response":
+      return ["conversation-response", node.alias || ""].join("|");
     case "wait":
       return ["wait", node.waitType, node.alias || ""].join("|");
     default:
@@ -113,7 +129,8 @@ function sequenceIdentity(node: SequenceItem): string {
 }
 
 function nodeFingerprint(node: SemanticNode): string {
-  if (node.kind === "trigger" || node.kind === "condition") return canonical(node.raw);
+  if (node.kind === "trigger") return canonical(normalizedTriggerRaw(node.raw));
+  if (node.kind === "condition") return canonical(node.raw);
 
   switch (node.kind) {
     case "if":
@@ -147,7 +164,13 @@ function nodeFingerprint(node: SemanticNode): string {
         kind: node.kind,
         alias: node.alias || null,
         branchCount: node.branches.length,
+        enabled: node.raw.enabled ?? true,
       });
+    case "sequence": {
+      const raw = { ...node.raw };
+      delete raw.sequence;
+      return canonical({ kind: node.kind, raw });
+    }
     default:
       return canonical(node.raw);
   }
@@ -158,11 +181,36 @@ function changedTopLevelKeys(before: UnknownRecord, after: UnknownRecord): strin
   return keys.filter((key) => canonical(before[key]) !== canonical(after[key]));
 }
 
+function greedyPairs<T>(before: T[], after: T[], identity: (value: T) => string): Array<[number, number]> {
+  const positions = new Map<string, number[]>();
+  after.forEach((item, index) => {
+    const key = identity(item);
+    const list = positions.get(key) ?? [];
+    list.push(index);
+    positions.set(key, list);
+  });
+
+  const pairs: Array<[number, number]> = [];
+  let lastAfter = -1;
+  for (let beforeIndex = 0; beforeIndex < before.length; beforeIndex += 1) {
+    const list = positions.get(identity(before[beforeIndex])) ?? [];
+    const afterIndex = list.find((index) => index > lastAfter);
+    if (afterIndex == null) continue;
+    pairs.push([beforeIndex, afterIndex]);
+    lastAfter = afterIndex;
+  }
+  return pairs;
+}
+
 function lcsPairs<T>(
   before: T[],
   after: T[],
   identity: (value: T) => string,
 ): Array<[number, number]> {
+  // Avoid quadratic memory/time on very large automations. The greedy fallback
+  // preserves order and semantic identity without allocating an O(n*m) matrix.
+  if (before.length * after.length > 25_000) return greedyPairs(before, after, identity);
+
   const rows = before.length + 1;
   const cols = after.length + 1;
   const table = Array.from({ length: rows }, () => Array<number>(cols).fill(0));
@@ -195,8 +243,8 @@ function lcsPairs<T>(
 function graphKind(node: SemanticNode): string {
   if (node.kind === "trigger") return "trigger";
   if (node.kind === "condition") return "condition";
-  if (node.kind === "service" || node.kind === "device-action") return "action";
-  if (node.kind === "if" || node.kind === "choose") return "control";
+  if (node.kind === "service" || node.kind === "device-action" || node.kind === "event" || node.kind === "conversation-response") return "action";
+  if (node.kind === "if" || node.kind === "choose" || node.kind === "sequence") return "control";
   if (node.kind === "repeat") return "loop";
   return node.kind;
 }
@@ -237,6 +285,8 @@ function markAddedSequence(items: SequenceItem[], ctx: DiffContext) {
       markAddedSequence(item.sequence, ctx);
     } else if (item.kind === "parallel") {
       item.branches.forEach((branch) => markAddedSequence(branch, ctx));
+    } else if (item.kind === "sequence") {
+      markAddedSequence(item.sequence, ctx);
     }
   }
 }
@@ -256,6 +306,8 @@ function markRemovedSequence(items: SequenceItem[], ctx: DiffContext) {
       markRemovedSequence(item.sequence, ctx);
     } else if (item.kind === "parallel") {
       item.branches.forEach((branch) => markRemovedSequence(branch, ctx));
+    } else if (item.kind === "sequence") {
+      markRemovedSequence(item.sequence, ctx);
     }
   }
 }
@@ -301,6 +353,8 @@ function compareSequenceNode(before: SequenceItem, after: SequenceItem, ctx: Dif
     for (let index = common; index < after.branches.length; index += 1) {
       markAddedSequence(after.branches[index], ctx);
     }
+  } else if (before.kind === "sequence" && after.kind === "sequence") {
+    matchSequence(before.sequence, after.sequence, ctx);
   }
 }
 
@@ -415,21 +469,34 @@ function removedGraphEdges(
 }
 
 function metadataChanges(before: AutomationModel, after: AutomationModel): AutomationDiffChange[] {
-  const fields: Array<[string, string | undefined, string | undefined]> = [
+  const fields: Array<[string, unknown, unknown]> = [
     ["Alias", before.alias, after.alias],
     ["Description", before.description, after.description],
     ["Mode", before.mode, after.mode],
+    ["Max", before.raw.max, after.raw.max],
+    ["Max exceeded", before.raw.max_exceeded, after.raw.max_exceeded],
+    ["Variables", before.raw.variables, after.raw.variables],
+    ["Trigger variables", before.raw.trigger_variables, after.raw.trigger_variables],
+    ["Trace", before.raw.trace, after.raw.trace],
+    ["Initial state", before.raw.initial_state, after.raw.initial_state],
   ];
 
+  const display = (value: unknown): string => {
+    if (value == null || value === "") return "—";
+    if (["string", "number", "boolean"].includes(typeof value)) return String(value);
+    const serialized = canonical(value);
+    return serialized.length > 160 ? `${serialized.slice(0, 157)}…` : serialized;
+  };
+
   return fields
-    .filter(([, left, right]) => left !== right)
+    .filter(([, left, right]) => canonical(left) !== canonical(right))
     .map(([label, left, right]) => ({
       key: `metadata:${label}`,
       status: "changed" as const,
       kind: "metadata",
       label,
-      beforeLabel: left || "—",
-      afterLabel: right || "—",
+      beforeLabel: display(left),
+      afterLabel: display(right),
       detail: "Automation metadata changed",
     }));
 }

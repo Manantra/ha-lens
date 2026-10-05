@@ -1069,3 +1069,17 @@ button.ghost { background: transparent; color: #dce3f5; }
 /* Disabled Home Assistant automation elements */
 .lens-node.is-disabled { opacity: .48; border-style: dashed; filter: saturate(.55); }
 .lens-node__disabled-badge { flex: 0 0 auto; border: 1px solid #555f70; border-radius: 999px; padding: 2px 6px; color: #a7b0bf; background: #1a1f29; font-size: 8px; font-weight: 850; text-transform: lowercase; }
+
+
+/* Home Assistant static and runtime targets */
+.target-list { display: flex; flex-direction: column; gap: 6px; }
+.target-card { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 7px; align-items: center; padding: 7px 8px; border: 1px solid #293244; border-radius: 9px; background: #131923; }
+.target-card code { min-width: 0; overflow-wrap: anywhere; white-space: normal; color: #c6d2e7; font-size: 9px; }
+.target-card small { color: #77c895; font-size: 7.5px; font-weight: 800; white-space: nowrap; }
+.target-card__kind { min-width: 42px; border: 1px solid #3b4659; border-radius: 999px; padding: 2px 5px; color: #93a2ba; font-size: 7px; font-weight: 900; text-align: center; text-transform: uppercase; }
+.target-card__kind--area, .target-card__kind--floor { border-color: #52668a; color: #9db7ea; }
+.target-card__kind--device { border-color: #6f5a86; color: #c6a9e5; }
+.target-card__kind--label { border-color: #806a42; color: #e0c58e; }
+.trace-step__targets { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.trace-step__targets small { display: inline-flex; min-width: 0; gap: 4px; align-items: center; border: 1px solid #35435a; border-radius: 999px; padding: 2px 5px; color: #a9b7ce; background: #151d29; font-size: 8px; overflow-wrap: anywhere; }
+.trace-step__targets b { color: #7184a5; font-size: 7px; text-transform: uppercase; }

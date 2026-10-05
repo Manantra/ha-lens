@@ -322,6 +322,20 @@ class HaLensPanel extends HTMLElement {
     return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
   }
 
+  _compactTarget(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const output = {};
+    for (const key of ["entity_id", "device_id", "area_id", "floor_id", "label_id"]) {
+      const raw = value[key];
+      const values = (Array.isArray(raw) ? raw : [raw])
+        .filter((item) => typeof item === "string" && item.length > 0)
+        .slice(0, 100)
+        .map((item) => this._compactString(item, 300));
+      if (values.length) output[key] = values;
+    }
+    return Object.keys(output).length ? output : null;
+  }
+
   _compactTraceResult(value) {
     if (value == null || typeof value !== "object" || Array.isArray(value)) {
       if (["string", "number", "boolean"].includes(typeof value)) return value;
@@ -339,6 +353,10 @@ class HaLensPanel extends HTMLElement {
     if (value.wait && typeof value.wait === "object" && typeof value.wait.completed === "boolean") {
       output.wait = { completed: value.wait.completed };
     }
+    if (typeof value.domain === "string") output.domain = this._compactString(value.domain, 120);
+    if (typeof value.service === "string") output.service = this._compactString(value.service, 120);
+    const target = this._compactTarget(value.target);
+    if (target) output.target = target;
     return Object.keys(output).length ? output : null;
   }
 
@@ -435,6 +453,7 @@ class HaLensPanel extends HTMLElement {
             timestamp: entry?.timestamp || null,
             error: this._compactString(entry?.error, 1000),
             result: this._compactTraceResult(entry?.result),
+            targets: this._compactTarget(entry?.result?.target),
           };
         })
       )

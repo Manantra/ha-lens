@@ -139,6 +139,8 @@ function addSequenceLabels(items: SequenceItem[], labels: Map<string, string>) {
       addSequenceLabels(item.sequence, labels);
     } else if (item.kind === "parallel") {
       item.branches.forEach((branch) => addSequenceLabels(branch, labels));
+    } else if (item.kind === "sequence") {
+      addSequenceLabels(item.sequence, labels);
     } else if (item.kind === "inline-condition") {
       addConditionLabels(item.condition, labels);
     }

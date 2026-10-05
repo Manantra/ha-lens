@@ -72,6 +72,13 @@ function expandSequence(items: SequenceItem[], input: PathState[], maxPaths: num
         next.push(cloneWith(state, { nodeId: item.id, label: item.summary, detail: "Loop shown symbolically" }));
       } else if (item.kind === "parallel") {
         next.push(cloneWith(state, { nodeId: item.id, label: item.summary, detail: "Parallel branches shown symbolically" }));
+      } else if (item.kind === "sequence") {
+        const nested = cloneWith(state, { nodeId: item.id, label: item.summary });
+        next.push(...expandSequence(item.sequence, [nested], maxPaths));
+      } else if (item.kind === "event") {
+        next.push(cloneWith(state, { nodeId: item.id, label: item.summary, detail: `event:${item.eventType}` }));
+      } else if (item.kind === "conversation-response") {
+        next.push(cloneWith(state, { nodeId: item.id, label: item.summary, detail: "conversation.response" }));
       } else {
         next.push(cloneWith(state, { nodeId: item.id, label: item.summary }));
       }

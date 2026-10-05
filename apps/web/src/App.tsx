@@ -30,6 +30,8 @@ interface CompanionEntityMetadata {
   device?: string | null;
 }
 
+type TargetMap = Partial<Record<"entity_id" | "device_id" | "area_id" | "floor_id" | "label_id", string[]>>;
+
 interface CompanionTraceStep {
   path: string;
   occurrence?: number;
@@ -37,6 +39,7 @@ interface CompanionTraceStep {
   timestamp?: string | null;
   error?: string | null;
   result?: unknown;
+  targets?: TargetMap | null;
 }
 
 interface CompanionTrace {
@@ -145,6 +148,7 @@ export function App() {
   const [exporting, setExporting] = useState<GraphExportFormat | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const [entityMetadata, setEntityMetadata] = useState<Record<string, CompanionEntityMetadata>>({});
+  const [automationReferences, setAutomationReferences] = useState<Record<string, string[]>>({});
   const [trace, setTrace] = useState<CompanionTrace | null>(null);
   const [triggerDiagnostic, setTriggerDiagnostic] = useState<CompanionTrace | null>(null);
   const [homeAssistantUnavailable, setHomeAssistantUnavailable] = useState(false);
@@ -172,6 +176,7 @@ export function App() {
         type?: string;
         config?: unknown;
         entityMetadata?: Record<string, CompanionEntityMetadata>;
+        automationReferences?: Record<string, string[]>;
         trace?: CompanionTrace | null;
         triggerDiagnostic?: CompanionTrace | null;
         homeAssistantUnavailable?: boolean;
@@ -182,6 +187,7 @@ export function App() {
       setYaml(source);
       setBaselineYaml(source);
       setEntityMetadata(message.entityMetadata && typeof message.entityMetadata === "object" ? message.entityMetadata : {});
+      setAutomationReferences(message.automationReferences && typeof message.automationReferences === "object" ? message.automationReferences : {});
       setTrace(message.trace && typeof message.trace === "object" ? message.trace : null);
       setTriggerDiagnostic(message.triggerDiagnostic && typeof message.triggerDiagnostic === "object" ? message.triggerDiagnostic : null);
       setHomeAssistantUnavailable(Boolean(message.homeAssistantUnavailable));
@@ -420,7 +426,7 @@ export function App() {
           <div className="tagline">See what your Home Assistant automation can do.</div>
         </div>
         <div className="topbar__actions">
-          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setBaselineYaml(sampleAutomation); setEntityMetadata({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); }}>Load example</button>
+          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setBaselineYaml(sampleAutomation); setEntityMetadata({}); setAutomationReferences({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); }}>Load example</button>
           <button className="ghost" disabled={!result.ok} onClick={() => void copyMermaid()}>{copyStatus === "copied" ? "Mermaid copied ✓" : copyStatus === "failed" ? "Copy failed" : "Copy Mermaid"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("svg")}>{exporting === "svg" ? "Exporting…" : "Export SVG"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
@@ -443,7 +449,7 @@ export function App() {
               </button>
             </div>
           </div>
-          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
+          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setAutomationReferences({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
         </aside>
 
         <section className="graph-panel panel">
@@ -702,6 +708,25 @@ export function App() {
                     ? result.analysis.actions.map((action) => <code key={action}>{action}</code>)
                     : <div className="empty-state">No service actions found.</div>}
                 </div>
+                <div className="entity-section-heading entity-section-heading--actions">
+                  <h3>Targets</h3>
+                  <span>{result.analysis.targets.reduce((sum, target) => sum + target.ids.length, 0)}</span>
+                </div>
+                <div className="target-list">
+                  {result.analysis.targets.length ? result.analysis.targets.flatMap((target) =>
+                    target.ids.map((id) => {
+                      const relatedKey = target.kind;
+                      const confirmed = (automationReferences[relatedKey] ?? []).includes(id);
+                      return (
+                        <div className="target-card" key={`${target.kind}:${id}`}>
+                          <span className={`target-card__kind target-card__kind--${target.kind}`}>{target.kind}</span>
+                          <code>{id}</code>
+                          {confirmed && <small title="Also resolved by Home Assistant search/related">HA resolved</small>}
+                        </div>
+                      );
+                    })
+                  ) : <div className="empty-state">No static entity/device/area/floor/label targets found.</div>}
+                </div>
               </>
             ) : tab === "diff" ? (
               <div className="diff-inspector">
@@ -831,6 +856,13 @@ export function App() {
                             <small className={step.error ? "trace-step__error" : ""}>
                               {stepDetail}
                             </small>
+                          )}
+                          {step.targets && Object.entries(step.targets).some(([, ids]) => ids?.length) && (
+                            <span className="trace-step__targets">
+                              {Object.entries(step.targets).flatMap(([kind, ids]) => (ids ?? []).map((id) => (
+                                <small key={`${kind}:${id}`}><b>{kind.replace("_id", "")}</b>{id}</small>
+                              )))}
+                            </span>
                           )}
                         </span>
                         <span className="trace-step__time">{step.timestamp ? new Date(step.timestamp).toLocaleTimeString() : nodeId ? "mapped" : "unmapped"}</span>

@@ -5,6 +5,8 @@ import type {
   ConditionNode,
   ParseResult,
   SequenceItem,
+  TargetReference,
+  TargetReferenceKind,
   TriggerNode,
   UnknownRecord,
 } from "@ha-lens/model";
@@ -39,6 +41,74 @@ function normalizeConditionRecord(value: unknown): UnknownRecord {
   if (raw.or != null) return { ...raw, condition: "or", conditions: raw.or };
   if (raw.not != null) return { ...raw, condition: "not", conditions: raw.not };
   return raw;
+}
+
+const targetKeyKinds: Array<[string, TargetReferenceKind]> = [
+  ["entity_id", "entity"],
+  ["device_id", "device"],
+  ["area_id", "area"],
+  ["floor_id", "floor"],
+  ["label_id", "label"],
+];
+
+function targetIds(value: unknown): string[] {
+  return asList(value)
+    .filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+    .map((item) => item.trim());
+}
+
+function extractTargets(raw: UnknownRecord): TargetReference[] {
+  const buckets = new Map<TargetReferenceKind, Set<string>>();
+  const addFrom = (record: UnknownRecord) => {
+    for (const [key, kind] of targetKeyKinds) {
+      for (const id of targetIds(record[key])) {
+        const set = buckets.get(kind) ?? new Set<string>();
+        set.add(id);
+        buckets.set(kind, set);
+      }
+    }
+  };
+  addFrom(raw);
+  addFrom(asRecord(raw.target));
+  return [...buckets.entries()].map(([kind, ids]) => ({ kind, ids: [...ids] }));
+}
+
+function attachConditionTargets(condition: ConditionNode) {
+  condition.targets = extractTargets(condition.raw);
+  condition.children?.forEach(attachConditionTargets);
+}
+
+function attachSequenceTargets(items: SequenceItem[]) {
+  for (const item of items) {
+    item.targets = extractTargets(item.raw);
+    if (item.kind === "if") {
+      item.conditions.forEach(attachConditionTargets);
+      attachSequenceTargets(item.then);
+      attachSequenceTargets(item.else);
+    } else if (item.kind === "choose") {
+      item.choices.forEach((choice) => {
+        choice.conditions.forEach(attachConditionTargets);
+        attachSequenceTargets(choice.sequence);
+      });
+      attachSequenceTargets(item.default);
+    } else if (item.kind === "repeat") {
+      attachSequenceTargets(item.sequence);
+    } else if (item.kind === "parallel") {
+      item.branches.forEach(attachSequenceTargets);
+    } else if (item.kind === "sequence") {
+      attachSequenceTargets(item.sequence);
+    } else if (item.kind === "inline-condition") {
+      attachConditionTargets(item.condition);
+    }
+  }
+}
+
+function targetSummary(raw: UnknownRecord): string {
+  const targets = extractTargets(raw);
+  if (!targets.length) return "";
+  return targets
+    .map((target) => `${target.kind}: ${target.ids.join(", ")}`)
+    .join(" · ");
 }
 
 const stringValue = (value: unknown, fallback: string) =>
@@ -122,7 +192,9 @@ function summarizeTrigger(raw: UnknownRecord): string {
     const eventType = compactValue(raw.type);
     return `Device${domain || eventType ? `: ${[domain, eventType].filter(Boolean).join(" · ")}` : " trigger"}`;
   }
-  return `${type} trigger`;
+  const target = targetSummary(raw);
+  const friendlyType = type.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return target ? `${friendlyType} → ${target}` : `${friendlyType} trigger`;
 }
 
 function summarizeCondition(raw: UnknownRecord): string {
@@ -297,6 +369,20 @@ function parseSequenceItem(value: unknown, id: string): SequenceItem {
     return { id, kind: "parallel", alias, summary: alias || `Parallel (${branches.length} branches)`, raw, branches };
   }
 
+  if (raw.sequence != null) {
+    const sequence = parseSequence(raw.sequence, `${id}.sequence`);
+    return { id, kind: "sequence", alias, summary: alias || `Sequence (${sequence.length} step${sequence.length === 1 ? "" : "s"})`, raw, sequence };
+  }
+
+  if (raw.event != null) {
+    const eventType = typeof raw.event === "string" ? raw.event : "templated event";
+    return { id, kind: "event", alias, eventType, summary: alias || `Fire event: ${eventType}`, raw };
+  }
+
+  if (raw.set_conversation_response != null) {
+    return { id, kind: "conversation-response", alias, summary: alias || "Set conversation response", raw };
+  }
+
   if (raw.wait_template != null) {
     return {
       id,
@@ -346,7 +432,7 @@ function parseSequenceItem(value: unknown, id: string): SequenceItem {
   const deviceAction = parseDeviceAction(raw, id, alias);
   if (deviceAction) return deviceAction;
 
-  const action = raw.action ?? raw.service;
+  const action = raw.action ?? raw.service ?? raw.service_template;
   if (typeof action === "string") {
     const target = asRecord(raw.target);
     const entity = entityText(target.entity_id ?? raw.entity_id);
@@ -412,6 +498,9 @@ export function parseAutomationYaml(source: string): ParseResult {
     actions: parseSequence(actionValues, "actions"),
     raw,
   };
+  automation.triggers.forEach((trigger) => { trigger.targets = extractTargets(trigger.raw); });
+  automation.conditions.forEach(attachConditionTargets);
+  attachSequenceTargets(automation.actions);
 
   if (!triggers.length) warnings.push("No trigger was found. This may be a script-like sequence or manually invoked automation.");
   if (triggers.some((trigger) => isDisabled(trigger.raw))) warnings.push("One or more triggers are disabled and are excluded from execution paths.");

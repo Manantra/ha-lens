@@ -181,3 +181,103 @@ actions: []
     expect(result.metadataChanges.map((change) => change.label)).toEqual(["Alias", "Mode"]);
   });
 });
+
+describe("automation diff Home Assistant 2026 compatibility", () => {
+  it("ignores Home Assistant generated trigger IDs but reports manual ID changes", () => {
+    const generated = diff(
+      `
+alias: Trigger IDs
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+actions: []
+`,
+      `
+alias: Trigger IDs
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+    id: generated-a3Xz
+actions: []
+`,
+    );
+    expect(generated.stats.added).toBe(0);
+    expect(generated.stats.removed).toBe(0);
+    expect(generated.stats.changed).toBe(0);
+
+    const manual = diff(
+      `
+alias: Trigger IDs
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+    id: motion-old
+actions: []
+`,
+      `
+alias: Trigger IDs
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+    id: motion-new
+actions: []
+`,
+    );
+    expect(manual.stats.added).toBe(0);
+    expect(manual.stats.removed).toBe(0);
+    expect(manual.stats.changed).toBe(1);
+    expect(manual.nodeStates.get("triggers.0")).toBe("changed");
+  });
+
+  it("reports runtime-affecting top-level metadata changes", () => {
+    const result = diff(
+      `
+alias: Metadata
+mode: parallel
+max: 2
+variables:
+  level: 1
+triggers: []
+actions: []
+`,
+      `
+alias: Metadata
+mode: parallel
+max: 10
+variables:
+  level: 2
+triggers: []
+actions: []
+`,
+    );
+    expect(result.metadataChanges.map((change) => change.label)).toEqual(expect.arrayContaining(["Max", "Variables"]));
+    expect(result.stats.changed).toBe(2);
+  });
+
+  it("diffs nested sequence children independently", () => {
+    const result = diff(
+      `
+alias: Sequence diff
+triggers: []
+actions:
+  - sequence:
+      - delay: "00:00:01"
+      - action: light.turn_on
+        target:
+          entity_id: light.hall
+`,
+      `
+alias: Sequence diff
+triggers: []
+actions:
+  - sequence:
+      - delay: "00:00:02"
+      - action: light.turn_on
+        target:
+          entity_id: light.hall
+`,
+    );
+    expect(result.nodeStates.get("actions.0.sequence.0")).toBe("changed");
+    expect(result.nodeStates.has("actions.0")).toBe(false);
+  });
+});

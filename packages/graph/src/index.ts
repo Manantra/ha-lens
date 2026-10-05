@@ -118,6 +118,18 @@ class Builder {
           this.connect(out, merge);
         });
         incoming = [{ id: merge }];
+      } else if (item.kind === "sequence") {
+        this.node({ id: item.id, kind: "control", label: item.summary, subtitle: "Nested sequence" });
+        this.connect(incoming, item.id);
+        incoming = item.sequence.length ? this.buildSequence(item.sequence, [{ id: item.id }]) : [{ id: item.id }];
+      } else if (item.kind === "event") {
+        this.node({ id: item.id, kind: "action", label: item.summary, subtitle: `Event · ${item.eventType}` });
+        this.connect(incoming, item.id);
+        incoming = [{ id: item.id }];
+      } else if (item.kind === "conversation-response") {
+        this.node({ id: item.id, kind: "action", label: item.summary, subtitle: "Conversation response" });
+        this.connect(incoming, item.id);
+        incoming = [{ id: item.id }];
       } else if (item.kind === "stop") {
         this.node({ id: item.id, kind: "stop", label: item.summary, disabled: item.raw.enabled === false });
         this.connect(incoming, item.id);

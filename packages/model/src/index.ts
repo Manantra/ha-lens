@@ -1,10 +1,18 @@
 export type UnknownRecord = Record<string, unknown>;
 
+export type TargetReferenceKind = "entity" | "device" | "area" | "floor" | "label";
+
+export interface TargetReference {
+  kind: TargetReferenceKind;
+  ids: string[];
+}
+
 export interface BaseNode {
   id: string;
   alias?: string;
   summary: string;
   raw: UnknownRecord;
+  targets?: TargetReference[];
 }
 
 export interface TriggerNode extends BaseNode {
@@ -81,6 +89,20 @@ export interface StopActionNode extends BaseNode {
   kind: "stop";
 }
 
+export interface SequenceActionNode extends BaseNode {
+  kind: "sequence";
+  sequence: SequenceItem[];
+}
+
+export interface EventActionNode extends BaseNode {
+  kind: "event";
+  eventType: string;
+}
+
+export interface ConversationResponseActionNode extends BaseNode {
+  kind: "conversation-response";
+}
+
 export interface InlineConditionActionNode extends BaseNode {
   kind: "inline-condition";
   condition: ConditionNode;
@@ -101,6 +123,9 @@ export type SequenceItem =
   | ParallelActionNode
   | VariablesActionNode
   | StopActionNode
+  | SequenceActionNode
+  | EventActionNode
+  | ConversationResponseActionNode
   | InlineConditionActionNode
   | UnknownActionNode;
 
@@ -146,6 +171,7 @@ export interface AnalysisResult {
   entityUsages: Record<string, string[]>;
   entityUsageDetails: Record<string, EntityUsageDetail[]>;
   actions: string[];
+  targets: TargetReference[];
   insights: Insight[];
 }
 
