@@ -455,7 +455,7 @@ class HaLensPanel extends HTMLElement {
             timestamp: entry?.timestamp || null,
             error: this._compactString(entry?.error, 1000),
             result: this._compactTraceResult(entry?.result),
-            targets: this._compactTarget(entry?.result?.target),
+            targets: this._compactTarget(entry?.result?.params?.target ?? entry?.result?.target),
           };
         })
       )

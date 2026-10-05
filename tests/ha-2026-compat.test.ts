@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { analyzeAutomation, explainAutomation } from "@ha-lens/analyzer";
 import { buildAutomationGraph } from "@ha-lens/graph";
@@ -161,5 +162,14 @@ actions:
       "actions.0.sequence.1",
       "actions.0.sequence.2",
     ]));
+  });
+});
+
+describe("Home Assistant companion 2026 trace contract", () => {
+  it("reads resolved service targets from result.params.target with legacy fallback", () => {
+    const panel = readFileSync("custom_components/ha_lens/frontend/ha-lens-panel.js", "utf8");
+    expect(panel).toContain("entry?.result?.params?.target ?? entry?.result?.target");
+    expect(panel).toContain('type: "automation/config"');
+    expect(panel).toContain('type: "search/related"');
   });
 });
