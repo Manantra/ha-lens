@@ -16,7 +16,7 @@
     "bundle:companion": "npm run build -w @ha-lens/web && node scripts/sync-companion-dist.mjs"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.6.4",
     "typescript": "^7.0.2",
     "vitest": "^5.0.1"
   }
