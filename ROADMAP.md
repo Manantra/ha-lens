@@ -2,7 +2,7 @@
 
 ## Current stable — v0.1.34
 
-The next release line is **v0.1.35**, focused on Home Assistant 2026 compatibility and security hardening rather than a new headline feature.
+Current prerelease: **v0.1.35-beta.1**, focused on Home Assistant 2026 compatibility and security hardening rather than a new headline feature.
 
 ### Visual inspection
 
