@@ -231,7 +231,9 @@ function summarizeCondition(raw: UnknownRecord): string {
     return `Device condition${domain || conditionType ? `: ${[domain, conditionType].filter(Boolean).join(" · ")}` : ""}`;
   }
   if (["and", "or", "not"].includes(type)) return `${type.toUpperCase()} condition`;
-  return `${type} condition`;
+  const target = targetSummary(raw);
+  const friendlyType = type.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  return target ? `${friendlyType} → ${target}` : `${friendlyType} condition`;
 }
 
 function parseCondition(value: unknown, id: string): ConditionNode {

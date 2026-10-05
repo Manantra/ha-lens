@@ -202,6 +202,27 @@ actions:
     expect(automation.triggers[0].summary).toContain("area: living_room");
   });
 
+  it("keeps purpose-specific conditions readable without hard-coding integration types", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Purpose-specific condition
+conditions:
+  - condition: occupancy
+    target:
+      area_id: living_room
+      label_id: occupied_spaces
+actions: []
+`);
+
+    expect(automation.conditions[0].conditionType).toBe("occupancy");
+    expect(automation.conditions[0].summary).toContain("Occupancy");
+    expect(automation.conditions[0].summary).toContain("area: living_room");
+    expect(automation.conditions[0].summary).toContain("label: occupied_spaces");
+    expect(analyzeAutomation(automation).targets).toEqual([
+      { kind: "area", ids: ["living_room"] },
+      { kind: "label", ids: ["occupied_spaces"] },
+    ]);
+  });
+
   it("surfaces action notes error policy response variables and error stops", () => {
     const { automation } = parseAutomationYaml(`
 alias: Action metadata
