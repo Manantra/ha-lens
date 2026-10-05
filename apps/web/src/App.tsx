@@ -15,6 +15,15 @@ import {
 } from "./traceMapping";
 import { sampleAutomation } from "./sample";
 import { buildAutomationDiff } from "./automationDiff";
+import {
+  sanitizeAutomationReferences,
+  sanitizeCompanionTrace,
+  sanitizeTargetMetadata,
+  type CompanionTargetMetadata,
+  type CompanionTrace,
+  type CompanionTraceStep,
+  type TargetMap,
+} from "./companionPayload";
 
 type Tab = "summary" | "paths" | "entities" | "diff" | "trace" | "insights" | "explain";
 type GraphFitMode = "all" | "width";
@@ -30,32 +39,7 @@ interface CompanionEntityMetadata {
   device?: string | null;
 }
 
-type TargetMap = Partial<Record<"entity_id" | "device_id" | "area_id" | "floor_id" | "label_id", string[]>>;
 
-type CompanionTargetMetadata = Record<string, Record<string, { name?: string | null }>>;
-
-interface CompanionTraceStep {
-  path: string;
-  occurrence?: number;
-  repeatIndex?: number | null;
-  timestamp?: string | null;
-  error?: string | null;
-  result?: unknown;
-  targets?: TargetMap | null;
-}
-
-interface CompanionTrace {
-  runId: string;
-  state?: string | null;
-  scriptExecution?: string | null;
-  startedAt?: string | null;
-  finishedAt?: string | null;
-  lastStep?: string | null;
-  error?: string | null;
-  notTriggered?: boolean;
-  paths: string[];
-  steps?: CompanionTraceStep[];
-}
 
 function formatTraceResult(value: unknown): string | null {
   if (value == null) return null;
@@ -196,24 +180,15 @@ export function App() {
       const metadata = message.entityMetadata && typeof message.entityMetadata === "object"
         ? Object.fromEntries(Object.entries(message.entityMetadata).slice(0, 5000))
         : {};
-      const references = message.automationReferences && typeof message.automationReferences === "object"
-        ? Object.fromEntries(Object.entries(message.automationReferences).slice(0, 20).map(([key, ids]) => [key, Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string").slice(0, 5000) : []]))
-        : {};
+      const references = sanitizeAutomationReferences(message.automationReferences);
       setEntityMetadata(metadata);
-      const targets = message.targetMetadata && typeof message.targetMetadata === "object"
-        ? Object.fromEntries(Object.entries(message.targetMetadata).slice(0, 10).map(([kind, values]) => [
-            kind,
-            values && typeof values === "object"
-              ? Object.fromEntries(Object.entries(values).slice(0, 5000).map(([id, value]) => [id, value && typeof value === "object" ? { name: typeof value.name === "string" ? value.name.slice(0, 300) : null } : {}]))
-              : {},
-          ]))
-        : {};
-      setTargetMetadata(targets);
+      setTargetMetadata(sanitizeTargetMetadata(message.targetMetadata));
       setAutomationReferences(references);
-      setTrace(message.trace && typeof message.trace === "object" ? message.trace : null);
-      setTriggerDiagnostic(message.triggerDiagnostic && typeof message.triggerDiagnostic === "object" ? message.triggerDiagnostic : null);
+      const sanitizedTrace = sanitizeCompanionTrace(message.trace);
+      setTrace(sanitizedTrace);
+      setTriggerDiagnostic(sanitizeCompanionTrace(message.triggerDiagnostic));
       setHomeAssistantUnavailable(Boolean(message.homeAssistantUnavailable));
-      setShowTrace(Boolean(message.trace));
+      setShowTrace(Boolean(sanitizedTrace));
       setSelectedPath(null);
       setSelectedEntity(null);
       setSelectedTraceNodeId(null);
