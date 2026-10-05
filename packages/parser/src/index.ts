@@ -264,6 +264,50 @@ function parseCondition(value: unknown, id: string): ConditionNode {
   };
 }
 
+function triggerReferenceIds(value: unknown): string[] {
+  return asList(value)
+    .filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+    .map((item) => item.trim());
+}
+
+function resolveTriggerConditionSummary(condition: ConditionNode, triggersById: Map<string, TriggerNode>) {
+  if (condition.conditionType === "trigger") {
+    const ids = triggerReferenceIds(condition.raw.id);
+    if (ids.length) {
+      condition.summary = `Triggered by: ${ids.map((id) => {
+        const trigger = triggersById.get(id);
+        return trigger ? (trigger.alias || trigger.summary) : id;
+      }).join(" / ")}`;
+    }
+  }
+  condition.children?.forEach((child) => resolveTriggerConditionSummary(child, triggersById));
+}
+
+function resolveSequenceTriggerConditions(items: SequenceItem[], triggersById: Map<string, TriggerNode>) {
+  for (const item of items) {
+    if (item.kind === "if") {
+      item.conditions.forEach((condition) => resolveTriggerConditionSummary(condition, triggersById));
+      resolveSequenceTriggerConditions(item.then, triggersById);
+      resolveSequenceTriggerConditions(item.else, triggersById);
+    } else if (item.kind === "choose") {
+      item.choices.forEach((choice) => {
+        choice.conditions.forEach((condition) => resolveTriggerConditionSummary(condition, triggersById));
+        resolveSequenceTriggerConditions(choice.sequence, triggersById);
+      });
+      resolveSequenceTriggerConditions(item.default, triggersById);
+    } else if (item.kind === "repeat") {
+      resolveSequenceTriggerConditions(item.sequence, triggersById);
+    } else if (item.kind === "parallel") {
+      item.branches.forEach((branch) => resolveSequenceTriggerConditions(branch, triggersById));
+    } else if (item.kind === "sequence") {
+      resolveSequenceTriggerConditions(item.sequence, triggersById);
+    } else if (item.kind === "inline-condition") {
+      resolveTriggerConditionSummary(item.condition, triggersById);
+      item.summary = item.condition.summary;
+    }
+  }
+}
+
 const SCRIPT_CONTROL_ACTIONS = new Set([
   "script.turn_on",
   "script.turn_off",
@@ -498,6 +542,16 @@ export function parseAutomationYaml(source: string): ParseResult {
     actions: parseSequence(actionValues, "actions"),
     raw,
   };
+  const triggersById = new Map(
+    automation.triggers.flatMap((trigger) =>
+      typeof trigger.raw.id === "string" && trigger.raw.id.trim()
+        ? [[trigger.raw.id.trim(), trigger] as const]
+        : []
+    ),
+  );
+  automation.conditions.forEach((condition) => resolveTriggerConditionSummary(condition, triggersById));
+  resolveSequenceTriggerConditions(automation.actions, triggersById);
+
   automation.triggers.forEach((trigger) => { trigger.targets = extractTargets(trigger.raw); });
   automation.conditions.forEach(attachConditionTargets);
   attachSequenceTargets(automation.actions);

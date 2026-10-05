@@ -6,6 +6,34 @@ import { parseAutomationYaml } from "@ha-lens/parser";
 import { enumerateExecutionPaths } from "@ha-lens/paths";
 
 describe("Home Assistant 2026 automation compatibility", () => {
+  it("resolves 2026.10 generated Triggered by IDs to readable trigger labels", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Trigger references
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+    to: "on"
+    id: generated-a3Xz
+    alias: Motion detected
+conditions:
+  - condition: trigger
+    id: generated-a3Xz
+actions:
+  - if:
+      - condition: trigger
+        id:
+          - generated-a3Xz
+          - missing-reference
+    then:
+      - delay: "00:00:01"
+`);
+
+    expect(automation.conditions[0].summary).toBe("Triggered by: Motion detected");
+    const block = automation.actions[0];
+    if (block.kind !== "if") throw new Error("expected if");
+    expect(block.conditions[0].summary).toBe("Triggered by: Motion detected / missing-reference");
+  });
+
   it("flattens nested trigger-list wrappers into Home Assistant runtime leaf order", () => {
     const { automation } = parseAutomationYaml(`
 alias: Trigger lists
