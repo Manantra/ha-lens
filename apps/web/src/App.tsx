@@ -330,6 +330,37 @@ export function App() {
     });
   }, [entityMetadata, result]);
 
+  const unifiedTargets = useMemo(() => {
+    if (!result.ok) return [];
+    const staticTargets = new Map<string, Set<string>>();
+    for (const target of result.analysis.targets) {
+      staticTargets.set(target.kind, new Set(target.ids));
+    }
+
+    const kinds = new Set([
+      ...staticTargets.keys(),
+      ...Object.keys(automationReferences),
+    ]);
+    return [...kinds]
+      .flatMap((kind) => {
+        const staticIds = staticTargets.get(kind) ?? new Set<string>();
+        const haIds = new Set(automationReferences[kind] ?? []);
+        return [...new Set([...staticIds, ...haIds])].map((id) => ({
+          kind,
+          id,
+          staticResolved: staticIds.has(id),
+          homeAssistantResolved: haIds.has(id),
+        }));
+      })
+      .sort((left, right) => {
+        const kindOrder = left.kind.localeCompare(right.kind);
+        if (kindOrder) return kindOrder;
+        const leftName = targetMetadata[left.kind]?.[left.id]?.name || left.id;
+        const rightName = targetMetadata[right.kind]?.[right.id]?.name || right.id;
+        return leftName.localeCompare(rightName, undefined, { sensitivity: "base" });
+      });
+  }, [automationReferences, result, targetMetadata]);
+
   const graphNodeEntityIcons = useMemo(() => {
     const icons = new Map<string, GraphEntityIcon[]>();
     if (!result.ok) return icons;
@@ -707,26 +738,36 @@ export function App() {
                 </div>
                 <div className="entity-section-heading entity-section-heading--actions">
                   <h3>Targets</h3>
-                  <span>{result.analysis.targets.reduce((sum, target) => sum + target.ids.length, 0)}</span>
+                  <span>{unifiedTargets.length}</span>
                 </div>
                 <div className="target-list">
-                  {result.analysis.targets.length ? result.analysis.targets.flatMap((target) =>
-                    target.ids.map((id) => {
-                      const relatedKey = target.kind;
-                      const confirmed = (automationReferences[relatedKey] ?? []).includes(id);
-                      const targetName = targetMetadata[target.kind]?.[id]?.name || id;
-                      return (
-                        <div className="target-card" key={`${target.kind}:${id}`}>
-                          <span className={`target-card__kind target-card__kind--${target.kind}`}>{target.kind}</span>
-                          <span className="target-card__identity">
-                            <strong>{targetName}</strong>
-                            {targetName !== id && <code>{id}</code>}
-                          </span>
-                          {confirmed && <small title="Also resolved by Home Assistant search/related">HA resolved</small>}
-                        </div>
-                      );
-                    })
-                  ) : <div className="empty-state">No static entity/device/area/floor/label targets found.</div>}
+                  {unifiedTargets.length ? unifiedTargets.map((target) => {
+                    const targetName = targetMetadata[target.kind]?.[target.id]?.name || target.id;
+                    const status = target.staticResolved && target.homeAssistantResolved
+                      ? "Static + HA"
+                      : target.homeAssistantResolved
+                        ? "HA only"
+                        : "Static only";
+                    return (
+                      <div className="target-card" key={`${target.kind}:${target.id}`}>
+                        <span className={`target-card__kind target-card__kind--${target.kind}`}>{target.kind}</span>
+                        <span className="target-card__identity">
+                          <strong>{targetName}</strong>
+                          {targetName !== target.id && <code>{target.id}</code>}
+                        </span>
+                        <small
+                          className={`target-card__status target-card__status--${target.homeAssistantResolved ? "ha" : "static"}`}
+                          title={target.homeAssistantResolved && !target.staticResolved
+                            ? "Resolved by Home Assistant but not found by the static HA Lens parser"
+                            : target.staticResolved && !target.homeAssistantResolved
+                              ? "Found statically; Home Assistant did not return it from related/runtime target resolution"
+                              : "Found statically and resolved by Home Assistant"}
+                        >
+                          {status}
+                        </small>
+                      </div>
+                    );
+                  }) : <div className="empty-state">No entity/device/area/floor/label targets found.</div>}
                 </div>
               </>
             ) : tab === "diff" ? (
@@ -860,9 +901,15 @@ export function App() {
                           )}
                           {step.targets && Object.entries(step.targets).some(([, ids]) => ids?.length) && (
                             <span className="trace-step__targets">
-                              {Object.entries(step.targets).flatMap(([kind, ids]) => (ids ?? []).map((id) => (
-                                <small key={`${kind}:${id}`}><b>{kind.replace("_id", "")}</b>{id}</small>
-                              )))}
+                              {Object.entries(step.targets).flatMap(([kind, ids]) => (ids ?? []).map((id) => {
+                                const semanticKind = kind.replace("_id", "");
+                                const targetName = targetMetadata[semanticKind]?.[id]?.name || id;
+                                return (
+                                  <small key={`${kind}:${id}`} title={targetName !== id ? id : undefined}>
+                                    <b>{semanticKind}</b>{targetName}
+                                  </small>
+                                );
+                              }))}
                             </span>
                           )}
                         </span>

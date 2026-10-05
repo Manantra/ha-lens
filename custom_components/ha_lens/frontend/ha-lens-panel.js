@@ -701,6 +701,35 @@ class HaLensPanel extends HTMLElement {
     return kinds;
   }
 
+  _relatedWithRuntimeTargets(related = {}, traces = {}) {
+    const output = Object.fromEntries(
+      Object.entries(related || {}).map(([kind, ids]) => [kind, Array.isArray(ids) ? [...ids] : []])
+    );
+    const keyMap = {
+      entity_id: "entity",
+      device_id: "device",
+      area_id: "area",
+      floor_id: "floor",
+      label_id: "label",
+    };
+    const seen = new Map(Object.entries(output).map(([kind, ids]) => [kind, new Set(ids)]));
+    for (const trace of [traces?.execution, traces?.diagnostic].filter(Boolean)) {
+      for (const step of trace?.steps || []) {
+        for (const [targetKey, ids] of Object.entries(step?.targets || {})) {
+          const kind = keyMap[targetKey];
+          if (!kind || !Array.isArray(ids)) continue;
+          const set = seen.get(kind) || new Set();
+          for (const id of ids) {
+            if (typeof id === "string" && id.length <= 300) set.add(id);
+          }
+          seen.set(kind, set);
+        }
+      }
+    }
+    for (const [kind, ids] of seen) output[kind] = [...ids].slice(0, 5000);
+    return output;
+  }
+
   _targetMetadata(config, related, registryData, entityMetadata) {
     const ids = this._targetIds(config, related);
     const areas = new Map((registryData?.areas || []).map((item) => [item.area_id, item]));
@@ -741,8 +770,9 @@ class HaLensPanel extends HTMLElement {
         this._latestTraces({ automationId }),
         this._registryData(),
       ]);
-      const entityMetadata = await this._entityMetadata(config, related, registryData);
-      const targetMetadata = this._targetMetadata(config, related, registryData, entityMetadata);
+      const resolvedReferences = this._relatedWithRuntimeTargets(related, traces);
+      const entityMetadata = await this._entityMetadata(config, resolvedReferences, registryData);
+      const targetMetadata = this._targetMetadata(config, resolvedReferences, registryData, entityMetadata);
 
       this._pendingMessage = {
         type: "ha-lens:automation",
@@ -751,7 +781,7 @@ class HaLensPanel extends HTMLElement {
         config,
         entityMetadata,
         targetMetadata,
-        automationReferences: related,
+        automationReferences: resolvedReferences,
         trace: traces.execution,
         triggerDiagnostic: traces.diagnostic,
         homeAssistantUnavailable: Boolean(selected?.unavailable),
