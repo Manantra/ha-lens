@@ -4,19 +4,19 @@
 
 HA Lens is a read-only visualizer and analyzer for Home Assistant automations. It turns automation YAML into a semantic flow graph, execution paths, entity/action inventory, structural insights, deterministic explanations, and—inside Home Assistant—a view of the latest runtime trace.
 
-> Current stable companion release: **v0.1.34**. HA Lens remains intentionally read-only: it analyzes automations but does not execute or modify them.
+> Current stable companion release: **v0.1.34**. The `main` branch is preparing **v0.1.35**, a Home Assistant 2026 compatibility/security hardening release. HA Lens remains intentionally read-only: it analyzes automations but does not execute or modify them.
 
 ## Why HA Lens?
 
 Visual flow editors are great for *building* automations. HA Lens is deliberately different: it is an inspection, explanation, documentation, presentation, and debugging aid for automations that already exist.
 
-- Visualize triggers, conditions, `if`, `choose`, waits, repeats, parallel blocks, scenes, scripts, device actions, and service calls.
+- Visualize triggers, conditions, `if`, `choose`, nested sequences, waits, repeats, parallel blocks, events, scenes, scripts, device actions, and service calls.
 - Explore bounded possible execution paths without touching Home Assistant.
-- See referenced entities and actions in one place, including common Jinja helper and dotted-state references.
+- See referenced entities, actions, and modern Home Assistant entity/device/area/floor/label targets in one place, including common Jinja helper and dotted-state references.
 - Render Home Assistant's own resolved entity icons in entity cards and directly on graph nodes, with local fallback glyphs only when Home Assistant cannot resolve an icon.
 - Click an entity to highlight its graph usage and see nested usage context.
 - Surface factual structural insights without pretending valid YAML is an error.
-- Inspect the latest Home Assistant trace with chronological runtime steps, results, errors, and graph highlighting.
+- Inspect the latest Home Assistant execution trace with chronological runtime steps, resolved targets, results, errors, and graph highlighting. Trigger checks that did not start the automation are shown separately and never masquerade as an execution.
 - Switch between **Structure** and **Last run** to see executed flow, explicit branch-not-taken decisions, and parts of the graph that were not reached.
 - Compare the current local YAML against a captured baseline in the **Diff** tab: added, changed, and removed nodes are shown both in a change list and directly in the graph. Removed baseline nodes remain visible only for comparison.
 - See observed repeat iteration counts (for example **3 iterations**) and observed parallel branch coverage (for example **3/3 branches**) from the latest Home Assistant trace.
@@ -30,7 +30,7 @@ Visual flow editors are great for *building* automations. HA Lens is deliberatel
 ## Quick start
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
@@ -59,7 +59,7 @@ custom_components Home Assistant / HACS companion
 
 ## Home Assistant companion
 
-The repository includes a read-only HACS-compatible custom integration under `custom_components/ha_lens`. It adds an admin-only HA Lens panel to the Home Assistant sidebar, lets you select an existing loaded automation, reads its configuration using Home Assistant's WebSocket API, enriches referenced entities with local registry metadata, and loads the latest automation trace when available.
+The repository includes a read-only HACS-compatible custom integration under `custom_components/ha_lens`. It adds an admin-only HA Lens panel to the Home Assistant sidebar. Automations are listed from Home Assistant state; only the selected automation is fetched through the official `automation/config` WebSocket command, while `search/related` and local registries provide entity/device/area/floor/label context. The latest real execution and the latest not-triggered diagnostic are loaded separately when available.
 
 No write action is registered. The compiled visualizer is bundled into the integration, so the Home Assistant companion does not depend on GitHub Pages at runtime.
 
@@ -67,7 +67,7 @@ See [`docs/hacs-companion.md`](docs/hacs-companion.md) for installation, archite
 
 ## Supported automation structure
 
-The parser recognizes top-level triggers/conditions/actions plus common script control flow: `if/then/else`, `choose/default`, inline conditions, delays, waits, repeat variants, parallel branches, variables, stop, scene shortcuts, direct/targeted script calls, device actions, and normal service actions.
+The parser recognizes top-level and nested trigger lists, enabled/disabled elements, logical-condition shorthands, `if/then/else`, `choose/default`, nested `sequence`, inline conditions, delays, waits, repeat variants, parallel branches, variables, stop, event actions, conversation responses, scene shortcuts, direct/targeted script calls, device actions, normal/service-template actions, and purpose-specific Home Assistant targets.
 
 Unsupported constructs become `unknown` nodes and remain visible.
 
@@ -85,9 +85,9 @@ The Home Assistant companion does **not** require GitHub Pages: HACS installs a 
 
 ## Roadmap
 
-The next development focus moves beyond the completed repeat/parallel trace and native icon work:
+The immediate focus is completing the v0.1.35 live compatibility pass against Home Assistant 2026.9 Stable and 2026.10 beta. After that:
 
-- additional runtime-label polish for deeply nested repeat/parallel combinations
+- additional runtime-label polish for unusually deep mixed control flow
 - read-only snapshots
 - optional lint rules
 
@@ -97,7 +97,7 @@ See [`ROADMAP.md`](ROADMAP.md) for the detailed checklist.
 
 The standalone app is designed to work entirely client-side. Your automation YAML is not sent to a HA Lens backend.
 
-The companion passes the selected automation, referenced-entity metadata, and a compact latest-trace summary between Home Assistant's local panel and its locally bundled same-origin viewer. HA Lens does not expose a Home Assistant token to the viewer and does not require an external service for analysis.
+The companion passes only the selected automation plus bounded metadata/trace data to a locally bundled **sandboxed** viewer. Parent/child messages use a per-panel random nonce and the viewer validates and caps incoming payloads. HA Lens does not expose a Home Assistant token to the viewer and does not require an external service for analysis.
 
 ## Contributing
 

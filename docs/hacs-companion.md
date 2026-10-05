@@ -1,44 +1,49 @@
 # HA Lens Home Assistant companion
 
-The HA Lens companion is intentionally read-only.
+The HA Lens companion is intentionally read-only and admin-only.
 
 ## What it does
 
 - Adds **HA Lens** to the Home Assistant sidebar.
-- Lists actual loaded automation objects through an admin-only, read-only HA Lens WebSocket command.
-- Includes each automation's existing raw configuration when Home Assistant exposes it.
-- Shows a diagnostic count for readable automations and entries hidden because no usable raw configuration is available.
-- Supports filtering the automation picker by alias or entity ID.
-- Loads friendly names, areas and devices for referenced entities from Home Assistant's local registries.
-- Resolves entity icons through Home Assistant itself and passes only the resulting SVG path data to the isolated HA Lens viewer.
-- Loads the latest Home Assistant automation trace when available.
-- Provides a dedicated Trace inspector with chronological runtime events, result/choice/condition details, errors, and graph-node mapping.
-- Highlights mapped nodes from the latest run in the graph.
-- Lets the YAML panel be collapsed for more graph space.
-- Provides **Fit all** and **Fit width** graph viewport modes.
-- Captures the selected Home Assistant automation as a local Diff baseline and compares local YAML edits as added / changed / removed without registering any write command.
-- Passes only the selected automation configuration, referenced-entity metadata, and compact trace data to the bundled viewer.
-- Does not register any write action and does not modify automation YAML.
-
-The panel requires an administrator. HA Lens exposes only read-only commands for loaded automation data; it does not register a command that can modify an automation.
+- Lists loaded `automation.*` entities from Home Assistant state.
+- Fetches only the selected automation using Home Assistant's official `automation/config` WebSocket command.
+- Resolves referenced entities, devices, areas, floors and labels with official `search/related` plus local registries.
+- Marks Home Assistant automations that are `unavailable` while still allowing their raw configuration to be inspected when `automation/config` is available.
+- Handles child-device area inheritance when registry metadata is available.
+- Resolves native Home Assistant entity icons and passes only SVG path data to the viewer.
+- Loads the latest real automation execution and the latest `not_triggered` trigger diagnostic separately.
+- Shows resolved runtime service targets from the Home Assistant trace where available.
+- Provides the Trace inspector, Structure/Last run coverage, repeat iteration counts and parallel branch coverage.
+- Captures a local Diff baseline and compares local YAML edits without registering any write command.
+- Does not register a Home Assistant action/service that can modify or execute an automation.
 
 ## Architecture
 
 ```text
-Home Assistant
-  └─ HA Lens custom panel
-       ├─ loaded automation raw_config
-       ├─ area/device/entity registries
-       ├─ local automation trace API
-       └─ postMessage(config + metadata + compact trace)
-             ↓
-       Bundled HA Lens viewer
-       /ha_lens_static/app/index.html
+Home Assistant admin panel
+  ├─ hass.states → automation picker
+  ├─ automation/config → selected config only
+  ├─ search/related → HA-resolved references
+  ├─ entity/device/area/floor/label registries → friendly metadata
+  ├─ trace/list + trace/get → execution + trigger diagnostic
+  └─ compact + bounded postMessage payload + random nonce
+            ↓
+  sandboxed bundled HA Lens viewer
+  /ha_lens_static/app/index.html
 ```
 
-The companion ships the compiled visualizer inside `custom_components/ha_lens/frontend/app` and Home Assistant serves it from `/ha_lens_static/app/`. Data is transferred between same-origin browser frames with `window.postMessage`; HA Lens has no external backend that receives the YAML or trace.
+The compiled visualizer is shipped inside `custom_components/ha_lens/frontend/app`. It therefore works without GitHub Pages and does not need an external HA Lens backend.
 
-The companion therefore works without GitHub Pages and does not need internet access after HACS has installed the integration. GitHub Pages remains available only for the standalone public demo.
+The viewer iframe is sandboxed without `allow-same-origin`. Because a sandboxed iframe has an opaque origin, parent/child messages use the concrete window source plus a per-instance random nonce instead of trusting a wildcard message by itself. Incoming trace/reference metadata is schema-filtered and bounded before use.
+
+## Home Assistant compatibility
+
+The repository contains an automated contract workflow for the official Home Assistant interfaces HA Lens depends on. The current hardening line checks:
+
+- Home Assistant **2026.9.4 Stable**
+- Home Assistant **2026.10 beta**, pinned to the exact upstream beta commit when the corresponding PyPI prerelease is not yet mirrored
+
+The checked contracts include `automation/config`, `search/related`, `trace/list`, `trace/get`, and floor/label registry list commands. HA Lens no longer imports Home Assistant's private automation component storage or exposes its own automation-config dump WebSocket command.
 
 ## HACS custom-repository install
 
@@ -52,7 +57,8 @@ Until HA Lens is published in a default HACS catalog:
 
 ## Deliberate limitations
 
-- Read-only.
-- Admin-only panel.
-- If Home Assistant cannot resolve an entity icon, HA Lens falls back to its offline domain-aware glyphs.
-- Trace-to-graph mapping remains best-effort for unusually deep or mixed control flow.
+- Read-only and admin-only.
+- Templates are not executed by HA Lens.
+- Exact runtime behavior remains Home Assistant's authority; static path expansion is bounded and loops/parallel interleavings stay symbolic.
+- If Home Assistant cannot resolve an entity icon, HA Lens falls back to an offline domain-aware glyph.
+- Trace-to-graph mapping is best-effort for unusually deep or mixed control-flow structures.
