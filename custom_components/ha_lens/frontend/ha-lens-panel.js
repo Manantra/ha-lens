@@ -502,20 +502,18 @@ class HaLensPanel extends HTMLElement {
         String(right?.timestamp?.start || "").localeCompare(String(left?.timestamp?.start || ""))
       );
 
-      let execution = null;
-      let diagnostic = null;
-      for (const summary of ordered.slice(0, 12)) {
-        if (execution && diagnostic) break;
-        const detail = await this._traceDetails(itemId, summary);
-        if (!detail) continue;
-        if (detail.notTriggered) {
-          diagnostic ||= detail;
-        } else {
-          execution ||= detail;
-        }
-      }
+      const executionSummary = ordered.find((summary) => summary?.not_triggered !== true) || null;
+      const diagnosticSummary = ordered.find((summary) => summary?.not_triggered === true) || null;
 
-      return { execution, diagnostic };
+      const [execution, diagnostic] = await Promise.all([
+        executionSummary ? this._traceDetails(itemId, executionSummary) : null,
+        diagnosticSummary ? this._traceDetails(itemId, diagnosticSummary) : null,
+      ]);
+
+      return {
+        execution: execution?.notTriggered ? null : execution,
+        diagnostic: diagnostic?.notTriggered ? diagnostic : null,
+      };
     } catch (error) {
       console.warn("HA Lens could not load automation traces", error);
       return { execution: null, diagnostic: null };
