@@ -38,6 +38,7 @@ jobs:
         run: |
           python - <<'PY'
           import importlib
+          import inspect
           import pathlib
 
           module = importlib.import_module("custom_components.ha_lens")
@@ -52,5 +53,18 @@ jobs:
           )
           for token in forbidden:
               assert token not in source, f"Private/custom HA API dependency returned: {token}"
-          print("HA Lens companion imports against Home Assistant and uses only the expected panel/static contract.")
+
+          contracts = {
+              "homeassistant.components.automation": ("automation/config",),
+              "homeassistant.components.search": ("search/related",),
+              "homeassistant.components.trace.websocket_api": ("trace/list", "trace/get"),
+              "homeassistant.components.config.floor_registry": ("config/floor_registry/list",),
+              "homeassistant.components.config.label_registry": ("config/label_registry/list",),
+          }
+          for module_name, tokens in contracts.items():
+              contract_source = inspect.getsource(importlib.import_module(module_name))
+              for token in tokens:
+                  assert token in contract_source, f"Home Assistant contract missing: {token} ({module_name})"
+
+          print("HA Lens imports and required official Home Assistant WebSocket contracts are available.")
           PY
