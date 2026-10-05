@@ -314,11 +314,14 @@ export function App() {
     [result],
   );
 
+  const inspectorTrace = trace ?? triggerDiagnostic;
+  const inspectorTraceIsDiagnostic = !trace && Boolean(triggerDiagnostic);
+
   const tabs = useMemo<Tab[]>(
-    () => trace
+    () => inspectorTrace
       ? ["summary", "paths", "entities", "diff", "trace", "insights", "explain"]
       : ["summary", "paths", "entities", "diff", "insights", "explain"],
-    [trace],
+    [inspectorTrace],
   );
 
   const sortedEntities = useMemo(() => {
@@ -842,31 +845,38 @@ export function App() {
                   </>
                 ) : null}
               </div>
-            ) : tab === "trace" && trace ? (
+            ) : tab === "trace" && inspectorTrace ? (
               <div className="trace-inspector">
+                {inspectorTraceIsDiagnostic && (
+                  <div className="notice notice--warning">
+                    <strong>Trigger diagnostic — automation did not run.</strong> Home Assistant recorded a trigger evaluation, but no automation execution started. These events are never used for Last run coverage.
+                  </div>
+                )}
                 <div className="trace-overview">
-                  <div><span>Started</span><strong>{formatTraceTime(trace.startedAt)}</strong></div>
-                  <div><span>Finished</span><strong>{trace.finishedAt ? formatTraceTime(trace.finishedAt) : "still running / unknown"}</strong></div>
-                  <div><span>Result</span><strong>{trace.scriptExecution || trace.state || "recorded"}</strong></div>
-                  <div><span>Last step</span><strong>{trace.lastStep || "unknown"}</strong></div>
+                  <div><span>Started</span><strong>{formatTraceTime(inspectorTrace.startedAt)}</strong></div>
+                  <div><span>Finished</span><strong>{inspectorTrace.finishedAt ? formatTraceTime(inspectorTrace.finishedAt) : "still running / unknown"}</strong></div>
+                  <div><span>Result</span><strong>{inspectorTrace.scriptExecution || inspectorTrace.state || "recorded"}</strong></div>
+                  <div><span>Last step</span><strong>{inspectorTrace.lastStep || "unknown"}</strong></div>
                 </div>
-                {trace.error && <div className="trace-card__error">{trace.error}</div>}
+                {inspectorTrace.error && <div className="trace-card__error">{inspectorTrace.error}</div>}
                 <div className="trace-toolbar">
-                  <span>{trace.steps?.length ?? trace.paths.length} runtime event{(trace.steps?.length ?? trace.paths.length) === 1 ? "" : "s"}</span>
-                  <button
-                    className="ghost trace-clear"
-                    onClick={() => {
-                      setSelectedTraceNodeId(null);
-                      setShowTrace(true);
-                    }}
-                  >
-                    Show full run
-                  </button>
+                  <span>{inspectorTrace.steps?.length ?? inspectorTrace.paths.length} runtime event{(inspectorTrace.steps?.length ?? inspectorTrace.paths.length) === 1 ? "" : "s"}</span>
+                  {trace && (
+                    <button
+                      className="ghost trace-clear"
+                      onClick={() => {
+                        setSelectedTraceNodeId(null);
+                        setShowTrace(true);
+                      }}
+                    >
+                      Show full run
+                    </button>
+                  )}
                 </div>
                 <div className="trace-step-list">
-                  {(trace.steps?.length
-                    ? trace.steps
-                    : trace.paths.map((path): CompanionTraceStep => ({ path }))
+                  {(inspectorTrace.steps?.length
+                    ? inspectorTrace.steps
+                    : inspectorTrace.paths.map((path): CompanionTraceStep => ({ path }))
                   ).map((step, index) => {
                     const nodeId = tracePathToNodeId(step.path, result.graph.nodes.map((node) => node.id));
                     const node = nodeId ? graphNodeById.get(nodeId) : undefined;
@@ -887,7 +897,7 @@ export function App() {
                           setSelectedPath(null);
                           setSelectedEntity(null);
                           setSelectedTraceNodeId(selected ? null : nodeId);
-                          setShowTrace(true);
+                          if (!inspectorTraceIsDiagnostic) setShowTrace(true);
                         }}
                       >
                         <span className="trace-step__number">{index + 1}</span>
@@ -918,7 +928,7 @@ export function App() {
                     );
                   })}
                 </div>
-                <p className="privacy">Trace data comes from Home Assistant's local trace API. HA Lens does not execute the automation.</p>
+                <p className="privacy">Trace data comes from Home Assistant's local trace API. Trigger diagnostics are kept separate from actual execution coverage. HA Lens does not execute the automation.</p>
               </div>
             ) : tab === "insights" ? (
               <>
