@@ -7,33 +7,62 @@ on:
       - "apps/web/**"
       - "packages/**"
       - "package.json"
+      - "package-lock.json"
       - "scripts/sync-companion-dist.mjs"
       - ".github/workflows/bundle-companion.yml"
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: companion-bundle
   cancel-in-progress: true
 
 jobs:
-  bundle:
+  build:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-node@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: 22
-      - run: npm install
+          node-version: 22.12.0
+          cache: npm
+      - name: Install dependencies reproducibly
+        run: npm ci --ignore-scripts
+      - name: Dependency security audit
+        run: npm audit --audit-level=high
       - run: npm run typecheck
       - run: npm test
       - name: Build local Home Assistant viewer
         run: npm run bundle:companion
         env:
           VITE_BASE_PATH: /ha_lens_static/app/
+      - name: Upload bundled frontend
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ha-lens-companion-frontend
+          path: custom_components/ha_lens/frontend/app
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+      - name: Download verified bundle
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: ha-lens-companion-frontend
+          path: custom_components/ha_lens/frontend/app
       - name: Commit bundled frontend
         run: |
           if [ -z "$(git status --porcelain -- custom_components/ha_lens/frontend/app)" ]; then
