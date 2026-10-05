@@ -68,6 +68,11 @@ jobs:
             echo "current=false" >> "$GITHUB_OUTPUT"
             echo "Skipping stale bundle: main advanced after this build started."
           fi
+      - name: Clear previously hashed bundle assets
+        if: steps.freshness.outputs.current == 'true'
+        run: |
+          rm -rf custom_components/ha_lens/frontend/app
+          mkdir -p custom_components/ha_lens/frontend/app
       - name: Download verified bundle
         if: steps.freshness.outputs.current == 'true'
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
