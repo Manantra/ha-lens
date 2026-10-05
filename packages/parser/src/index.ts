@@ -20,13 +20,21 @@ const asList = <T = unknown>(value: unknown): T[] => {
 };
 
 const isDisabled = (raw: UnknownRecord): boolean => raw.enabled === false;
+const MAX_NESTING_DEPTH = 64;
 
-function flattenTriggerRecords(value: unknown): UnknownRecord[] {
+function assertSafeDepth(depth: number) {
+  if (depth > MAX_NESTING_DEPTH) {
+    throw new Error(`Automation nesting exceeds HA Lens safety limit (${MAX_NESTING_DEPTH})`);
+  }
+}
+
+function flattenTriggerRecords(value: unknown, depth = 0): UnknownRecord[] {
+  assertSafeDepth(depth);
   const output: UnknownRecord[] = [];
   for (const entry of asList(value)) {
     const raw = asRecord(entry);
     if (raw.triggers != null && raw.trigger == null && raw.platform == null) {
-      output.push(...flattenTriggerRecords(raw.triggers));
+      output.push(...flattenTriggerRecords(raw.triggers, depth + 1));
       continue;
     }
     output.push(raw);
@@ -236,7 +244,8 @@ function summarizeCondition(raw: UnknownRecord): string {
   return target ? `${friendlyType} → ${target}` : `${friendlyType} condition`;
 }
 
-function parseCondition(value: unknown, id: string): ConditionNode {
+function parseCondition(value: unknown, id: string, depth = 0): ConditionNode {
+  assertSafeDepth(depth);
   if (typeof value === "string") {
     const raw: UnknownRecord = {
       condition: "template",
@@ -254,7 +263,7 @@ function parseCondition(value: unknown, id: string): ConditionNode {
   const raw = normalizeConditionRecord(value);
   const conditionType = stringValue(raw.condition, "unknown");
   const children = ["and", "or", "not"].includes(conditionType)
-    ? asList(raw.conditions).map((condition, index) => parseCondition(condition, `${id}.conditions.${index}`))
+    ? asList(raw.conditions).map((condition, index) => parseCondition(condition, `${id}.conditions.${index}`, depth + 1))
     : undefined;
 
   return {
@@ -350,11 +359,13 @@ function parseDeviceAction(raw: UnknownRecord, id: string, alias?: string): Sequ
   };
 }
 
-function parseSequence(value: unknown, prefix: string): SequenceItem[] {
-  return asList(value).map((item, index) => parseSequenceItem(item, `${prefix}.${index}`));
+function parseSequence(value: unknown, prefix: string, depth = 0): SequenceItem[] {
+  assertSafeDepth(depth);
+  return asList(value).map((item, index) => parseSequenceItem(item, `${prefix}.${index}`, depth));
 }
 
-function parseSequenceItem(value: unknown, id: string): SequenceItem {
+function parseSequenceItem(value: unknown, id: string, depth = 0): SequenceItem {
+  assertSafeDepth(depth);
   const raw = asRecord(value);
   const alias = typeof raw.alias === "string" ? raw.alias : undefined;
 
@@ -365,9 +376,9 @@ function parseSequenceItem(value: unknown, id: string): SequenceItem {
       alias,
       summary: alias || "If / then / else",
       raw,
-      conditions: asList(raw.if).map((condition, index) => parseCondition(condition, `${id}.if.${index}`)),
-      then: parseSequence(raw.then, `${id}.then`),
-      else: parseSequence(raw.else, `${id}.else`),
+      conditions: asList(raw.if).map((condition, index) => parseCondition(condition, `${id}.if.${index}`, depth + 1)),
+      then: parseSequence(raw.then, `${id}.then`, depth + 1),
+      else: parseSequence(raw.else, `${id}.else`, depth + 1),
     };
   }
 
@@ -378,9 +389,9 @@ function parseSequenceItem(value: unknown, id: string): SequenceItem {
         id: `${id}.choose.${index}`,
         alias: typeof choice.alias === "string" ? choice.alias : undefined,
         conditions: asList(choice.conditions).map((condition, conditionIndex) =>
-          parseCondition(condition, `${id}.choose.${index}.conditions.${conditionIndex}`),
+          parseCondition(condition, `${id}.choose.${index}.conditions.${conditionIndex}`, depth + 1),
         ),
-        sequence: parseSequence(choice.sequence, `${id}.choose.${index}.sequence`),
+        sequence: parseSequence(choice.sequence, `${id}.choose.${index}.sequence`, depth + 1),
       };
     });
     return {
@@ -390,7 +401,7 @@ function parseSequenceItem(value: unknown, id: string): SequenceItem {
       summary: alias || `Choose (${choices.length} option${choices.length === 1 ? "" : "s"})`,
       raw,
       choices,
-      default: parseSequence(raw.default, `${id}.default`),
+      default: parseSequence(raw.default, `${id}.default`, depth + 1),
     };
   }
 
@@ -404,7 +415,7 @@ function parseSequenceItem(value: unknown, id: string): SequenceItem {
       summary: alias || `Repeat: ${repeatType}`,
       raw,
       repeatType,
-      sequence: parseSequence(repeat.sequence, `${id}.repeat.sequence`),
+      sequence: parseSequence(repeat.sequence, `${id}.repeat.sequence`, depth + 1),
     };
   }
 
@@ -412,13 +423,13 @@ function parseSequenceItem(value: unknown, id: string): SequenceItem {
     const branches = asList(raw.parallel).map((branch, index) => {
       const branchRecord = asRecord(branch);
       const sequence = branchRecord.sequence ?? branch;
-      return parseSequence(sequence, `${id}.parallel.${index}`);
+      return parseSequence(sequence, `${id}.parallel.${index}`, depth + 1);
     });
     return { id, kind: "parallel", alias, summary: alias || `Parallel (${branches.length} branches)`, raw, branches };
   }
 
   if (raw.sequence != null) {
-    const sequence = parseSequence(raw.sequence, `${id}.sequence`);
+    const sequence = parseSequence(raw.sequence, `${id}.sequence`, depth + 1);
     return { id, kind: "sequence", alias, summary: alias || `Sequence (${sequence.length} step${sequence.length === 1 ? "" : "s"})`, raw, sequence };
   }
 
@@ -462,7 +473,7 @@ function parseSequenceItem(value: unknown, id: string): SequenceItem {
   if (raw.stop != null) return { id, kind: "stop", alias, summary: alias || `Stop: ${String(raw.stop)}`, raw };
 
   if (raw.condition != null || raw.and != null || raw.or != null || raw.not != null) {
-    const condition = parseCondition(raw, `${id}.condition`);
+    const condition = parseCondition(raw, `${id}.condition`, depth + 1);
     return { id, kind: "inline-condition", alias, summary: condition.summary, raw, condition };
   }
 

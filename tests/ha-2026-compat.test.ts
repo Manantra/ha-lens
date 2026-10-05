@@ -106,6 +106,13 @@ actions:
     expect(analysis.entities).not.toContain("{{ target_light }}");
   });
 
+  it("rejects pathological nesting before the browser stack is exhausted", () => {
+    let action: unknown = { delay: "00:00:01" };
+    for (let index = 0; index < 70; index += 1) action = { sequence: [action] };
+    const source = JSON.stringify({ alias: "Too deep", triggers: [], actions: [action] });
+    expect(() => parseAutomationYaml(source)).toThrow(/nesting exceeds HA Lens safety limit/);
+  });
+
   it("keeps disabled elements visible but excludes them from execution paths", () => {
     const { automation } = parseAutomationYaml(`
 alias: Disabled semantics
