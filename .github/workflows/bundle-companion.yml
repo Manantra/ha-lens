@@ -58,12 +58,24 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: main
+      - name: Ensure this build still matches main
+        id: freshness
+        shell: bash
+        run: |
+          if [ "$(git rev-parse HEAD)" = "$GITHUB_SHA" ]; then
+            echo "current=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "Skipping stale bundle: main advanced after this build started."
+          fi
       - name: Download verified bundle
+        if: steps.freshness.outputs.current == 'true'
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: ha-lens-companion-frontend
           path: custom_components/ha_lens/frontend/app
       - name: Commit bundled frontend
+        if: steps.freshness.outputs.current == 'true'
         run: |
           if [ -z "$(git status --porcelain -- custom_components/ha_lens/frontend/app)" ]; then
             echo "Bundled frontend is already current."

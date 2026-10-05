@@ -156,6 +156,7 @@ export function App() {
   const [selectedTraceNodeId, setSelectedTraceNodeId] = useState<string | null>(null);
   const [selectedDiffNodeId, setSelectedDiffNodeId] = useState<string | null>(null);
   const embedded = useMemo(() => new URLSearchParams(window.location.search).get("embedded") === "1", []);
+  const channelNonce = useMemo(() => new URLSearchParams(window.location.search).get("channel"), []);
 
   useEffect(() => {
     if (window.parent === window) return;
@@ -174,6 +175,7 @@ export function App() {
 
       const message = event.data as {
         type?: string;
+        nonce?: string;
         config?: unknown;
         entityMetadata?: Record<string, CompanionEntityMetadata>;
         automationReferences?: Record<string, string[]>;
@@ -181,13 +183,20 @@ export function App() {
         triggerDiagnostic?: CompanionTrace | null;
         homeAssistantUnavailable?: boolean;
       };
-      if (message.type !== "ha-lens:automation" || !message.config || typeof message.config !== "object") return;
+      if (message.type !== "ha-lens:automation" || message.nonce !== channelNonce || !message.config || typeof message.config !== "object" || Array.isArray(message.config)) return;
 
       const source = serializeAutomationYaml(message.config);
+      if (source.length > 2_000_000) return;
       setYaml(source);
       setBaselineYaml(source);
-      setEntityMetadata(message.entityMetadata && typeof message.entityMetadata === "object" ? message.entityMetadata : {});
-      setAutomationReferences(message.automationReferences && typeof message.automationReferences === "object" ? message.automationReferences : {});
+      const metadata = message.entityMetadata && typeof message.entityMetadata === "object"
+        ? Object.fromEntries(Object.entries(message.entityMetadata).slice(0, 5000))
+        : {};
+      const references = message.automationReferences && typeof message.automationReferences === "object"
+        ? Object.fromEntries(Object.entries(message.automationReferences).slice(0, 20).map(([key, ids]) => [key, Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string").slice(0, 5000) : []]))
+        : {};
+      setEntityMetadata(metadata);
+      setAutomationReferences(references);
       setTrace(message.trace && typeof message.trace === "object" ? message.trace : null);
       setTriggerDiagnostic(message.triggerDiagnostic && typeof message.triggerDiagnostic === "object" ? message.triggerDiagnostic : null);
       setHomeAssistantUnavailable(Boolean(message.homeAssistantUnavailable));
@@ -200,10 +209,10 @@ export function App() {
     };
 
     window.addEventListener("message", receiveAutomation);
-    window.parent.postMessage({ type: "ha-lens:ready", version: 1 }, parentOrigin ?? "*");
+    if (channelNonce) window.parent.postMessage({ type: "ha-lens:ready", version: 2, nonce: channelNonce }, parentOrigin ?? "*");
 
     return () => window.removeEventListener("message", receiveAutomation);
-  }, []);
+  }, [channelNonce]);
 
   const result = useMemo(() => {
     try {

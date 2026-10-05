@@ -16,6 +16,7 @@ class HaLensPanel extends HTMLElement {
     this._diagnosticsText = "";
     this._filterQuery = "";
     this._targetOrigin = window.location.origin;
+    this._channelNonce = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
     this._onWindowMessage = this._onWindowMessage.bind(this);
   }
 
@@ -53,6 +54,7 @@ class HaLensPanel extends HTMLElement {
     const version = this._panel?.config?.version;
     if (version) url.searchParams.set("v", String(version));
     url.searchParams.set("embedded", "1");
+    url.searchParams.set("channel", this._channelNonce);
     return url.toString();
   }
 
@@ -170,7 +172,7 @@ class HaLensPanel extends HTMLElement {
           </select>
           <div class="status">Read-only · select an automation</div>
         </div>
-        <iframe title="HA Lens automation analyzer"></iframe>
+        <iframe title="HA Lens automation analyzer" sandbox="allow-scripts allow-downloads"></iframe>
       </div>
     `;
 
@@ -518,6 +520,28 @@ class HaLensPanel extends HTMLElement {
     }
   }
 
+  _cacheIcon(key, value) {
+    if (this._iconPathCache.has(key)) this._iconPathCache.delete(key);
+    this._iconPathCache.set(key, value);
+    while (this._iconPathCache.size > 512) {
+      const oldestKey = this._iconPathCache.keys().next().value;
+      this._iconPathCache.delete(oldestKey);
+    }
+  }
+
+  async _mapLimit(items, limit, mapper) {
+    const results = new Array(items.length);
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < items.length) {
+        const index = cursor++;
+        results[index] = await mapper(items[index], index);
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, () => worker()));
+    return results;
+  }
+
   async _readResolvedIcon(element, timeoutMs = 2500) {
     const started = Date.now();
 
@@ -569,7 +593,7 @@ class HaLensPanel extends HTMLElement {
     }
 
     if (!element) {
-      this._iconPathCache.set(cacheKey, null);
+      this._cacheIcon(cacheKey, null);
       return null;
     }
 
@@ -579,7 +603,7 @@ class HaLensPanel extends HTMLElement {
 
     try {
       const resolved = await this._readResolvedIcon(element);
-      this._iconPathCache.set(cacheKey, resolved);
+      this._cacheIcon(cacheKey, resolved);
       return resolved;
     } finally {
       element.remove();
@@ -613,9 +637,8 @@ class HaLensPanel extends HTMLElement {
         .filter((entity) => typeof entity.id === "string" && entity.id)
         .map((entity) => [entity.id, entity])
     );
-    const metadata = {};
 
-    for (const entityId of entityIds) {
+    const entries = await this._mapLimit([...entityIds].slice(0, 5000), 6, async (entityId) => {
       const registry = entitiesById.get(entityId) || entitiesByRegistryId.get(entityId);
       const resolvedEntityId = registry?.entity_id || (/^[a-z0-9_]+\.[a-z0-9_]+$/i.test(entityId) ? entityId : null);
       const state = resolvedEntityId ? this._hass?.states?.[resolvedEntityId] : null;
@@ -625,8 +648,7 @@ class HaLensPanel extends HTMLElement {
 
       const iconOverride = registry?.icon || state?.attributes?.icon || null;
       const resolvedIcon = await this._resolveEntityIcon(state, iconOverride);
-
-      metadata[entityId] = {
+      return [entityId, {
         entityId: resolvedEntityId,
         name: registry?.name || state?.attributes?.friendly_name || registry?.original_name || resolvedEntityId || entityId,
         icon: resolvedIcon?.icon || iconOverride,
@@ -635,10 +657,10 @@ class HaLensPanel extends HTMLElement {
         iconViewBox: resolvedIcon?.viewBox || null,
         area: area?.name || null,
         device: device?.name_by_user || device?.name || null,
-      };
-    }
+      }];
+    });
 
-    return metadata;
+    return Object.fromEntries(entries);
   }
 
   async _loadAutomation(entityId) {
@@ -693,12 +715,15 @@ class HaLensPanel extends HTMLElement {
 
   _sendPending() {
     if (!this._pendingMessage || !this._frame?.contentWindow) return;
-    this._frame.contentWindow.postMessage(this._pendingMessage, this._targetOrigin);
+    this._frame.contentWindow.postMessage(
+      { ...this._pendingMessage, nonce: this._channelNonce },
+      "*",
+    );
   }
 
   _onWindowMessage(event) {
     if (!this._frame?.contentWindow || event.source !== this._frame.contentWindow) return;
-    if (event.origin !== this._targetOrigin) return;
+    if (event.data?.nonce !== this._channelNonce) return;
     if (event.data?.type === "ha-lens:ready") this._sendPending();
   }
 
