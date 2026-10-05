@@ -83,6 +83,35 @@ function extractTargets(raw: UnknownRecord): TargetReference[] {
   return [...buckets.entries()].map(([kind, ids]) => ({ kind, ids: [...ids] }));
 }
 
+function mergeTargets(...groups: Array<TargetReference[] | undefined>): TargetReference[] {
+  const buckets = new Map<TargetReferenceKind, Set<string>>();
+  for (const group of groups) {
+    for (const target of group ?? []) {
+      const set = buckets.get(target.kind) ?? new Set<string>();
+      target.ids.forEach((id) => set.add(id));
+      buckets.set(target.kind, set);
+    }
+  }
+  return [...buckets.entries()].map(([kind, ids]) => ({ kind, ids: [...ids] }));
+}
+
+function conditionTreeTargets(value: unknown, depth = 0): TargetReference[] {
+  assertSafeDepth(depth);
+  const raw = normalizeConditionRecord(value);
+  const own = extractTargets(raw);
+  const type = stringValue(raw.condition, "unknown");
+  if (!["and", "or", "not"].includes(type)) return own;
+  return mergeTargets(
+    own,
+    ...asList(raw.conditions).map((condition) => conditionTreeTargets(condition, depth + 1)),
+  );
+}
+
+function triggerListTargets(value: unknown, depth = 0): TargetReference[] {
+  assertSafeDepth(depth);
+  return mergeTargets(...flattenTriggerRecords(value, depth).map(extractTargets));
+}
+
 function attachConditionTargets(condition: ConditionNode) {
   condition.targets = extractTargets(condition.raw);
   condition.children?.forEach(attachConditionTargets);
@@ -102,6 +131,12 @@ function attachSequenceTargets(items: SequenceItem[]) {
       });
       attachSequenceTargets(item.default);
     } else if (item.kind === "repeat") {
+      const repeat = asRecord(item.raw.repeat);
+      item.targets = mergeTargets(
+        item.targets,
+        ...asList(repeat.while).map((condition) => conditionTreeTargets(condition)),
+        ...asList(repeat.until).map((condition) => conditionTreeTargets(condition)),
+      );
       attachSequenceTargets(item.sequence);
     } else if (item.kind === "parallel") {
       item.branches.forEach(attachSequenceTargets);
@@ -109,6 +144,8 @@ function attachSequenceTargets(items: SequenceItem[]) {
       attachSequenceTargets(item.sequence);
     } else if (item.kind === "inline-condition") {
       attachConditionTargets(item.condition);
+    } else if (item.kind === "wait" && item.waitType === "trigger") {
+      item.targets = mergeTargets(item.targets, triggerListTargets(item.raw.wait_for_trigger));
     }
   }
 }

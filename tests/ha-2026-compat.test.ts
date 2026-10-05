@@ -230,6 +230,50 @@ actions: []
     ]);
   });
 
+  it("extracts static targets from repeat conditions and wait-for-trigger lists", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Nested control targets
+actions:
+  - repeat:
+      while:
+        - condition: occupancy
+          target:
+            area_id: hallway
+        - or:
+            - condition: presence
+              target:
+                label_id: watched
+            - condition: state
+              entity_id: input_boolean.keep_running
+              state: "on"
+      sequence:
+        - delay: "00:00:01"
+  - wait_for_trigger:
+      - triggers:
+          - trigger: motion
+            target:
+              device_id: device-abc
+          - trigger: state
+            entity_id: binary_sensor.door
+    timeout: "00:00:10"
+`);
+
+    expect(analyzeAutomation(automation).targets).toEqual([
+      { kind: "entity", ids: ["binary_sensor.door", "input_boolean.keep_running"] },
+      { kind: "device", ids: ["device-abc"] },
+      { kind: "area", ids: ["hallway"] },
+      { kind: "label", ids: ["watched"] },
+    ]);
+    expect(automation.actions[0].targets).toEqual(expect.arrayContaining([
+      { kind: "area", ids: ["hallway"] },
+      { kind: "label", ids: ["watched"] },
+    ]));
+    expect(automation.actions[1].targets).toEqual(expect.arrayContaining([
+      { kind: "entity", ids: ["binary_sensor.door"] },
+      { kind: "device", ids: ["device-abc"] },
+    ]));
+  });
+
   it("surfaces action notes error policy response variables and error stops", () => {
     const { automation } = parseAutomationYaml(`
 alias: Action metadata
