@@ -262,6 +262,45 @@ actions:
     expect(executedLabels).toEqual(expect.arrayContaining(["loop", "repeat", "continue"]));
   });
 
+  it("keeps nested repeat and parallel runtime coverage separate", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Nested runtime coverage
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+actions:
+  - repeat:
+      count: 2
+      sequence:
+        - parallel:
+            - sequence:
+                - delay: "00:00:01"
+            - sequence:
+                - delay: "00:00:02"
+`);
+
+    const graph = buildAutomationGraph(automation);
+    const coverage = buildTraceCoverage([
+      { path: "trigger/0" },
+      { path: "action/0" },
+      { path: "action/0/repeat/sequence/0", occurrence: 0, repeatIndex: 1 },
+      { path: "action/0/repeat/sequence/0/parallel/0/sequence/0", occurrence: 0, repeatIndex: 1 },
+      { path: "action/0/repeat/sequence/0/parallel/1/sequence/0", occurrence: 0, repeatIndex: 1 },
+      { path: "action/0/repeat/sequence/0", occurrence: 1, repeatIndex: 2 },
+      { path: "action/0/repeat/sequence/0/parallel/0/sequence/0", occurrence: 1, repeatIndex: 2 },
+      { path: "action/0/repeat/sequence/0/parallel/1/sequence/0", occurrence: 1, repeatIndex: 2 },
+    ], graph);
+
+    expect(coverage.repeatIterationCounts.get("actions.0")).toBe(2);
+    const parallel = coverage.parallelBranchCoverage.get("actions.0.repeat.sequence.0");
+    expect(parallel?.totalBranches).toBe(2);
+    expect([...parallel?.observedBranchIndexes ?? []]).toEqual([0, 1]);
+
+    const parallelEdges = graph.edges.filter((edge) => edge.source === "actions.0.repeat.sequence.0");
+    expect(parallelEdges.filter((edge) => coverage.executedEdgeIds.has(edge.id)).map((edge) => edge.label))
+      .toEqual(expect.arrayContaining(["branch 1", "branch 2"]));
+  });
+
   it("tracks observed parallel branches without calling missing branches untaken", () => {
     const { automation } = parseAutomationYaml(`
 alias: Parallel coverage
