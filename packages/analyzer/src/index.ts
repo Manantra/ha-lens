@@ -18,7 +18,9 @@ function collectTemplateEntities(value: unknown, output: Set<string>) {
     for (const [key, child] of Object.entries(value as UnknownRecord)) {
       if (key === "entity_id") {
         const values = Array.isArray(child) ? child : [child];
-        values.filter((item): item is string => typeof item === "string").forEach((item) => output.add(item));
+        values
+          .filter((item): item is string => typeof item === "string" && (/^[a-z0-9_]+\.[a-z0-9_]+$/i.test(item) || /^[a-f0-9]{20,}$/i.test(item)))
+          .forEach((item) => output.add(item));
       }
       if (key === "scene" && typeof child === "string" && /^[a-z0-9_]+\.[a-z0-9_]+$/i.test(child)) {
         output.add(child);
@@ -154,7 +156,9 @@ function collectRecordEntities(raw: UnknownRecord, output: Set<string>, ignoredK
     if (ignoredKeys.has(key)) continue;
     if (key === "entity_id") {
       const values = Array.isArray(child) ? child : [child];
-      values.filter((item): item is string => typeof item === "string").forEach((item) => output.add(item));
+      values
+        .filter((item): item is string => typeof item === "string" && (/^[a-z0-9_]+\.[a-z0-9_]+$/i.test(item) || /^[a-f0-9]{20,}$/i.test(item)))
+        .forEach((item) => output.add(item));
     }
     if (
       (key === "action" || key === "service")

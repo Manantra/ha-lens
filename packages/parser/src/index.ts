@@ -36,6 +36,7 @@ function flattenTriggerRecords(value: unknown): UnknownRecord[] {
 
 function normalizeConditionRecord(value: unknown): UnknownRecord {
   const raw = asRecord(value);
+  if (Array.isArray(raw.condition)) return { ...raw, condition: "and", conditions: raw.condition };
   if (raw.condition != null) return raw;
   if (raw.and != null) return { ...raw, condition: "and", conditions: raw.and };
   if (raw.or != null) return { ...raw, condition: "or", conditions: raw.or };
@@ -54,7 +55,8 @@ const targetKeyKinds: Array<[string, TargetReferenceKind]> = [
 function targetIds(value: unknown): string[] {
   return asList(value)
     .filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
-    .map((item) => item.trim());
+    .map((item) => item.trim())
+    .filter((item) => !item.includes("{{") && !item.includes("{%"));
 }
 
 function extractTargets(raw: UnknownRecord): TargetReference[] {
@@ -457,7 +459,7 @@ function parseSequenceItem(value: unknown, id: string): SequenceItem {
   if (raw.variables != null) return { id, kind: "variables", alias, summary: alias || "Set variables", raw };
   if (raw.stop != null) return { id, kind: "stop", alias, summary: alias || `Stop: ${String(raw.stop)}`, raw };
 
-  if (raw.condition != null) {
+  if (raw.condition != null || raw.and != null || raw.or != null || raw.not != null) {
     const condition = parseCondition(raw, `${id}.condition`);
     return { id, kind: "inline-condition", alias, summary: condition.summary, raw, condition };
   }

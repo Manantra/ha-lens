@@ -63,6 +63,49 @@ actions:
     ]);
   });
 
+  it("normalizes condition-list and inline logical shorthand", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Shorthand conditions
+conditions:
+  - condition:
+      - condition: state
+        entity_id: input_boolean.a
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.b
+        state: "on"
+actions:
+  - or:
+      - condition: state
+        entity_id: input_boolean.c
+        state: "on"
+      - condition: state
+        entity_id: input_boolean.d
+        state: "on"
+`);
+
+    expect(automation.conditions[0].conditionType).toBe("and");
+    expect(automation.conditions[0].children).toHaveLength(2);
+    expect(automation.actions[0].kind).toBe("inline-condition");
+    if (automation.actions[0].kind !== "inline-condition") throw new Error("expected inline condition");
+    expect(automation.actions[0].condition.conditionType).toBe("or");
+    expect(automation.actions[0].condition.children).toHaveLength(2);
+  });
+
+  it("does not report templated target strings as concrete IDs", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Dynamic target
+actions:
+  - action: light.turn_on
+    target:
+      entity_id: "{{ target_light }}"
+      area_id: "{{ target_area }}"
+`);
+    const analysis = analyzeAutomation(automation);
+    expect(analysis.targets).toEqual([]);
+    expect(analysis.entities).not.toContain("{{ target_light }}");
+  });
+
   it("keeps disabled elements visible but excludes them from execution paths", () => {
     const { automation } = parseAutomationYaml(`
 alias: Disabled semantics
