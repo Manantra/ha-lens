@@ -9,6 +9,7 @@ class HaLensPanel extends HTMLElement {
     this._selected = "";
     this._pendingMessage = null;
     this._registryPromise = null;
+    this._relatedCache = new Map();
     this._iconPathCache = new Map();
     this._automationItems = [];
     this._automationListPromise = null;
@@ -206,41 +207,34 @@ class HaLensPanel extends HTMLElement {
   }
 
   async _refreshAutomations() {
-    if (!this._hass?.callWS) return;
+    if (!this._hass?.states) return;
     if (this._automationListPromise) return this._automationListPromise;
 
-    this._automationListPromise = this._hass.callWS({ type: "ha_lens/automations" })
-      .then((payload) => {
-        const items = Array.isArray(payload) ? payload : (payload?.automations ?? []);
-        const usable = Array.isArray(payload) ? items.length : (payload?.usable ?? items.length);
-        const hidden = Array.isArray(payload) ? 0 : (payload?.hidden_without_config ?? 0);
-        const totalLoaded = Array.isArray(payload) ? items.length : (payload?.total_loaded ?? usable + hidden);
+    this._automationListPromise = Promise.resolve()
+      .then(() => {
+        const states = Object.values(this._hass.states || {})
+          .filter((state) => typeof state?.entity_id === "string" && state.entity_id.startsWith("automation."));
 
-        this._automationItems = items
-          .filter((item) =>
-            item?.entity_id
-            && item?.config
-            && typeof item.config === "object"
-            && !Array.isArray(item.config)
-          )
-          .map((item) => ({
-            entityId: item.entity_id,
-            name: item.name || item.entity_id,
-            automationId: item.id ?? null,
-            config: item.config ?? null,
+        this._automationItems = states
+          .map((state) => ({
+            entityId: state.entity_id,
+            name: state.attributes?.friendly_name || state.entity_id,
+            unavailable: state.state === "unavailable",
           }))
           .sort((left, right) => left.name.localeCompare(right.name));
 
-        const diagnostics = [`${usable} available`];
-        if (hidden > 0) diagnostics.push(`${hidden} hidden (no readable config)`);
-        if (totalLoaded !== usable + hidden) diagnostics.push(`${totalLoaded} loaded by Home Assistant`);
+        const unavailable = this._automationItems.filter((item) => item.unavailable).length;
+        const available = this._automationItems.length - unavailable;
+        const diagnostics = [`${available} available`];
+        if (unavailable > 0) diagnostics.push(`${unavailable} unavailable`);
+        diagnostics.push(`${this._automationItems.length} loaded by Home Assistant`);
         this._diagnosticsText = diagnostics.join(" · ");
 
         this._syncAutomations();
         this._setStatus(
           this._automationItems.length
             ? `Read-only · ${this._diagnosticsText}`
-            : `No readable automations · ${this._diagnosticsText}`,
+            : "No automations loaded by Home Assistant",
           false,
         );
       })
@@ -283,7 +277,8 @@ class HaLensPanel extends HTMLElement {
     for (const automation of visible) {
       const option = document.createElement("option");
       option.value = automation.entityId;
-      option.textContent = automation.name;
+      option.textContent = automation.unavailable ? `⚠ ${automation.name}` : automation.name;
+      if (automation.unavailable) option.title = "Home Assistant reports this automation as unavailable";
       this._select.append(option);
     }
 
@@ -291,6 +286,60 @@ class HaLensPanel extends HTMLElement {
       this._select.value = previous;
       this._selected = previous;
     }
+  }
+
+  async _automationConfig(entityId) {
+    if (!this._hass?.callWS) throw new Error("Home Assistant WebSocket API is unavailable.");
+    const config = await this._hass.callWS({
+      type: "automation/config",
+      entity_id: entityId,
+    });
+    if (!config || typeof config !== "object" || Array.isArray(config)) {
+      throw new Error(`Home Assistant did not return a readable config for ${entityId}.`);
+    }
+    return config;
+  }
+
+  async _automationRelated(entityId) {
+    if (!this._hass?.callWS) return {};
+    if (this._relatedCache.has(entityId)) return this._relatedCache.get(entityId);
+
+    const promise = this._hass.callWS({
+      type: "search/related",
+      item_type: "automation",
+      item_id: entityId,
+    }).catch((error) => {
+      console.warn("HA Lens could not load Home Assistant related references", error);
+      return {};
+    });
+    this._relatedCache.set(entityId, promise);
+    return promise;
+  }
+
+  _compactString(value, maxLength = 600) {
+    if (value == null) return null;
+    const text = String(value);
+    return text.length > maxLength ? `${text.slice(0, maxLength - 1)}…` : text;
+  }
+
+  _compactTraceResult(value) {
+    if (value == null || typeof value !== "object" || Array.isArray(value)) {
+      if (["string", "number", "boolean"].includes(typeof value)) return value;
+      return null;
+    }
+
+    const output = {};
+    if (typeof value.result === "boolean") output.result = value.result;
+    if (["string", "number", "boolean"].includes(typeof value.choice)) {
+      output.choice = typeof value.choice === "string" ? this._compactString(value.choice, 160) : value.choice;
+    }
+    if (typeof value.timeout === "boolean") output.timeout = value.timeout;
+    if (["string", "number", "boolean"].includes(typeof value.stop)) output.stop = this._compactString(value.stop, 300);
+    if (["string", "number", "boolean"].includes(typeof value.delay)) output.delay = this._compactString(value.delay, 160);
+    if (value.wait && typeof value.wait === "object" && typeof value.wait.completed === "boolean") {
+      output.wait = { completed: value.wait.completed };
+    }
+    return Object.keys(output).length ? output : null;
   }
 
   _isDirectScriptAction(value) {
@@ -365,8 +414,55 @@ class HaLensPanel extends HTMLElement {
     return this._registryPromise;
   }
 
-  async _latestTrace(automation) {
-    if (!automation?.automationId || !this._hass?.callWS) return null;
+  async _traceDetails(itemId, summary) {
+    if (!summary?.run_id) return null;
+    const extended = await this._hass.callWS({
+      type: "trace/get",
+      domain: "automation",
+      item_id: itemId,
+      run_id: summary.run_id,
+    });
+
+    const traceEntries = Object.entries(extended?.trace || {});
+    const allSteps = traceEntries
+      .flatMap(([path, entries]) =>
+        (Array.isArray(entries) ? entries : []).map((entry, occurrence) => {
+          const repeatIndex = entry?.changed_variables?.repeat?.index;
+          return {
+            path: this._compactString(path, 500),
+            occurrence,
+            repeatIndex: Number.isInteger(repeatIndex) && repeatIndex > 0 ? repeatIndex : null,
+            timestamp: entry?.timestamp || null,
+            error: this._compactString(entry?.error, 1000),
+            result: this._compactTraceResult(entry?.result),
+          };
+        })
+      )
+      .sort((left, right) => {
+        const timeOrder = String(left.timestamp || "").localeCompare(String(right.timestamp || ""));
+        return timeOrder || left.path.localeCompare(right.path) || left.occurrence - right.occurrence;
+      });
+
+    const stepLimit = 2000;
+    return {
+      runId: extended?.run_id || summary.run_id,
+      state: this._compactString(extended?.state || summary?.state, 120),
+      scriptExecution: this._compactString(extended?.script_execution ?? summary?.script_execution, 120),
+      startedAt: extended?.timestamp?.start || summary?.timestamp?.start || null,
+      finishedAt: extended?.timestamp?.finish || summary?.timestamp?.finish || null,
+      lastStep: this._compactString(extended?.last_step ?? summary?.last_step, 500),
+      error: this._compactString(extended?.error || summary?.error, 1000),
+      notTriggered: Boolean(extended?.not_triggered ?? summary?.not_triggered),
+      paths: traceEntries.slice(0, stepLimit).map(([path]) => this._compactString(path, 500)),
+      steps: allSteps.slice(0, stepLimit),
+      truncated: allSteps.length > stepLimit || traceEntries.length > stepLimit,
+    };
+  }
+
+  async _latestTraces(automation) {
+    if (!automation?.automationId || !this._hass?.callWS) {
+      return { execution: null, diagnostic: null };
+    }
 
     try {
       const itemId = String(automation.automationId);
@@ -375,55 +471,31 @@ class HaLensPanel extends HTMLElement {
         domain: "automation",
         item_id: itemId,
       });
-      if (!Array.isArray(traces) || !traces.length) return null;
+      if (!Array.isArray(traces) || !traces.length) {
+        return { execution: null, diagnostic: null };
+      }
 
-      const latest = [...traces].sort((left, right) =>
+      const ordered = [...traces].sort((left, right) =>
         String(right?.timestamp?.start || "").localeCompare(String(left?.timestamp?.start || ""))
-      )[0];
-      if (!latest?.run_id) return null;
+      );
 
-      const extended = await this._hass.callWS({
-        type: "trace/get",
-        domain: "automation",
-        item_id: itemId,
-        run_id: latest.run_id,
-      });
+      let execution = null;
+      let diagnostic = null;
+      for (const summary of ordered.slice(0, 12)) {
+        if (execution && diagnostic) break;
+        const detail = await this._traceDetails(itemId, summary);
+        if (!detail) continue;
+        if (detail.notTriggered) {
+          diagnostic ||= detail;
+        } else {
+          execution ||= detail;
+        }
+      }
 
-      const traceEntries = Object.entries(extended?.trace || {});
-      const steps = traceEntries
-        .flatMap(([path, entries]) =>
-          (Array.isArray(entries) ? entries : []).map((entry, occurrence) => {
-            const repeatIndex = entry?.changed_variables?.repeat?.index;
-            return {
-              path,
-              occurrence,
-              repeatIndex: Number.isInteger(repeatIndex) && repeatIndex > 0 ? repeatIndex : null,
-              timestamp: entry?.timestamp || null,
-              error: entry?.error || null,
-              result: entry?.result ?? null,
-            };
-          })
-        )
-        .sort((left, right) => {
-          const timeOrder = String(left.timestamp || "").localeCompare(String(right.timestamp || ""));
-          return timeOrder || left.path.localeCompare(right.path) || left.occurrence - right.occurrence;
-        });
-
-      return {
-        runId: extended?.run_id || latest.run_id,
-        state: extended?.state || latest?.state || null,
-        scriptExecution: extended?.script_execution ?? latest?.script_execution ?? null,
-        startedAt: extended?.timestamp?.start || latest?.timestamp?.start || null,
-        finishedAt: extended?.timestamp?.finish || latest?.timestamp?.finish || null,
-        lastStep: extended?.last_step ?? latest?.last_step ?? null,
-        error: extended?.error || latest?.error || null,
-        notTriggered: Boolean(extended?.not_triggered ?? latest?.not_triggered),
-        paths: traceEntries.map(([path]) => path),
-        steps,
-      };
+      return { execution, diagnostic };
     } catch (error) {
-      console.warn("HA Lens could not load the latest automation trace", error);
-      return null;
+      console.warn("HA Lens could not load automation traces", error);
+      return { execution: null, diagnostic: null };
     }
   }
 
@@ -495,8 +567,23 @@ class HaLensPanel extends HTMLElement {
     }
   }
 
-  async _entityMetadata(config) {
+  _deviceAreaId(device, devicesById) {
+    let current = device;
+    const visited = new Set();
+    for (let depth = 0; current && depth < 8; depth += 1) {
+      if (current.area_id) return current.area_id;
+      if (!current.parent_device_id || visited.has(current.parent_device_id)) break;
+      visited.add(current.parent_device_id);
+      current = devicesById.get(current.parent_device_id);
+    }
+    return null;
+  }
+
+  async _entityMetadata(config, related = {}) {
     const entityIds = this._collectEntityIds(config);
+    for (const entityId of related?.entity || []) {
+      if (typeof entityId === "string") entityIds.add(entityId);
+    }
     const { areas, devices, entities } = await this._registryData();
 
     const areasById = new Map(areas.map((area) => [area.area_id, area]));
@@ -514,7 +601,7 @@ class HaLensPanel extends HTMLElement {
       const resolvedEntityId = registry?.entity_id || (/^[a-z0-9_]+\.[a-z0-9_]+$/i.test(entityId) ? entityId : null);
       const state = resolvedEntityId ? this._hass?.states?.[resolvedEntityId] : null;
       const device = registry?.device_id ? devicesById.get(registry.device_id) : null;
-      const areaId = registry?.area_id || device?.area_id;
+      const areaId = registry?.area_id || this._deviceAreaId(device, devicesById);
       const area = areaId ? areasById.get(areaId) : null;
 
       const iconOverride = registry?.icon || state?.attributes?.icon || null;
@@ -545,31 +632,34 @@ class HaLensPanel extends HTMLElement {
 
     try {
       const selected = this._automations().find((automation) => automation.entityId === entityId);
-      const config = selected?.config ?? null;
-
-      if (!config) {
-        throw new Error(`No loaded config for ${entityId}. Refresh HA Lens after Home Assistant reloads automations.`);
-      }
-
-      const [entityMetadata, trace] = await Promise.all([
-        this._entityMetadata(config),
-        this._latestTrace(selected),
+      const config = await this._automationConfig(entityId);
+      const automationId = config?.id != null ? String(config.id) : null;
+      const [related, traces] = await Promise.all([
+        this._automationRelated(entityId),
+        this._latestTraces({ automationId }),
       ]);
+      const entityMetadata = await this._entityMetadata(config, related);
 
       this._pendingMessage = {
         type: "ha-lens:automation",
-        version: 1,
+        version: 2,
         entityId,
         config,
         entityMetadata,
-        trace,
+        automationReferences: related,
+        trace: traces.execution,
+        triggerDiagnostic: traces.diagnostic,
+        homeAssistantUnavailable: Boolean(selected?.unavailable),
       };
 
       this._sendPending();
       const selectedLabel = selected ? selected.name : entityId;
+      const availabilityLabel = selected?.unavailable ? " · unavailable in Home Assistant" : "";
       this._setStatus(
-        this._diagnosticsText ? `${selectedLabel} · ${this._diagnosticsText}` : selectedLabel,
-        false,
+        this._diagnosticsText
+          ? `${selectedLabel}${availabilityLabel} · ${this._diagnosticsText}`
+          : `${selectedLabel}${availabilityLabel}`,
+        Boolean(selected?.unavailable),
       );
     } catch (error) {
       console.error("HA Lens could not load the automation", error);

@@ -146,6 +146,8 @@ export function App() {
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const [entityMetadata, setEntityMetadata] = useState<Record<string, CompanionEntityMetadata>>({});
   const [trace, setTrace] = useState<CompanionTrace | null>(null);
+  const [triggerDiagnostic, setTriggerDiagnostic] = useState<CompanionTrace | null>(null);
+  const [homeAssistantUnavailable, setHomeAssistantUnavailable] = useState(false);
   const [showTrace, setShowTrace] = useState(false);
   const [selectedTraceNodeId, setSelectedTraceNodeId] = useState<string | null>(null);
   const [selectedDiffNodeId, setSelectedDiffNodeId] = useState<string | null>(null);
@@ -171,6 +173,8 @@ export function App() {
         config?: unknown;
         entityMetadata?: Record<string, CompanionEntityMetadata>;
         trace?: CompanionTrace | null;
+        triggerDiagnostic?: CompanionTrace | null;
+        homeAssistantUnavailable?: boolean;
       };
       if (message.type !== "ha-lens:automation" || !message.config || typeof message.config !== "object") return;
 
@@ -179,6 +183,8 @@ export function App() {
       setBaselineYaml(source);
       setEntityMetadata(message.entityMetadata && typeof message.entityMetadata === "object" ? message.entityMetadata : {});
       setTrace(message.trace && typeof message.trace === "object" ? message.trace : null);
+      setTriggerDiagnostic(message.triggerDiagnostic && typeof message.triggerDiagnostic === "object" ? message.triggerDiagnostic : null);
+      setHomeAssistantUnavailable(Boolean(message.homeAssistantUnavailable));
       setShowTrace(Boolean(message.trace));
       setSelectedPath(null);
       setSelectedEntity(null);
@@ -414,7 +420,7 @@ export function App() {
           <div className="tagline">See what your Home Assistant automation can do.</div>
         </div>
         <div className="topbar__actions">
-          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setBaselineYaml(sampleAutomation); setEntityMetadata({}); setTrace(null); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); }}>Load example</button>
+          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setBaselineYaml(sampleAutomation); setEntityMetadata({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); }}>Load example</button>
           <button className="ghost" disabled={!result.ok} onClick={() => void copyMermaid()}>{copyStatus === "copied" ? "Mermaid copied ✓" : copyStatus === "failed" ? "Copy failed" : "Copy Mermaid"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("svg")}>{exporting === "svg" ? "Exporting…" : "Export SVG"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
@@ -437,7 +443,7 @@ export function App() {
               </button>
             </div>
           </div>
-          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setTrace(null); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
+          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
         </aside>
 
         <section className="graph-panel panel">
@@ -573,17 +579,34 @@ export function App() {
               <>
                 <h2>{result.automation.alias}</h2>
                 {result.automation.description && <p className="muted">{result.automation.description}</p>}
+                {homeAssistantUnavailable && (
+                  <div className="notice notice--warning">Home Assistant currently marks this automation as unavailable. HA Lens can still inspect the raw configuration, but the automation is not runnable in Home Assistant until its validation issue is resolved.</div>
+                )}
                 {trace && (
                   <div className="trace-card">
                     <div>
-                      <strong>Last Home Assistant run</strong>
+                      <strong>Last Home Assistant execution</strong>
                       <span>{formatTraceTime(trace.startedAt)}</span>
                     </div>
                     <div className="trace-card__meta">
-                      <span>{trace.notTriggered ? "not triggered" : (trace.scriptExecution || trace.state || "recorded")}</span>
+                      <span>{trace.scriptExecution || trace.state || "recorded"}</span>
                       <span>{trace.paths.length} traced step{trace.paths.length === 1 ? "" : "s"}</span>
                     </div>
                     {trace.error && <div className="trace-card__error">{trace.error}</div>}
+                  </div>
+                )}
+                {triggerDiagnostic && (
+                  <div className="trace-card trace-card--diagnostic">
+                    <div>
+                      <strong>Latest trigger diagnostic</strong>
+                      <span>{formatTraceTime(triggerDiagnostic.startedAt)}</span>
+                    </div>
+                    <div className="trace-card__meta">
+                      <span>not triggered</span>
+                      <span>{triggerDiagnostic.lastStep || "trigger evaluated"}</span>
+                    </div>
+                    <p className="trace-card__diagnostic-copy">Home Assistant evaluated a trigger but did not start the automation. This diagnostic is intentionally excluded from Last run coverage.</p>
+                    {triggerDiagnostic.error && <div className="trace-card__error">{triggerDiagnostic.error}</div>}
                   </div>
                 )}
                 <div className="stat-grid">
@@ -757,7 +780,7 @@ export function App() {
                 <div className="trace-overview">
                   <div><span>Started</span><strong>{formatTraceTime(trace.startedAt)}</strong></div>
                   <div><span>Finished</span><strong>{trace.finishedAt ? formatTraceTime(trace.finishedAt) : "still running / unknown"}</strong></div>
-                  <div><span>Result</span><strong>{trace.notTriggered ? "not triggered" : (trace.scriptExecution || trace.state || "recorded")}</strong></div>
+                  <div><span>Result</span><strong>{trace.scriptExecution || trace.state || "recorded"}</strong></div>
                   <div><span>Last step</span><strong>{trace.lastStep || "unknown"}</strong></div>
                 </div>
                 {trace.error && <div className="trace-card__error">{trace.error}</div>}

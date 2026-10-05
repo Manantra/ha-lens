@@ -1056,3 +1056,11 @@ button.ghost { background: transparent; color: #dce3f5; }
   .diff-header { flex-direction: column; }
   .diff-baseline-button { width: 100%; }
 }
+
+/* Home Assistant compatibility diagnostics */
+.notice--warning { border-color: #7b5d2c; background: #2a2113; color: #e7c98b; }
+.trace-card--diagnostic { border-color: #725b2d; background: #211b11; }
+.trace-card--diagnostic strong { color: #f1d59a; }
+.trace-card--diagnostic span { color: #b9a16f; }
+.trace-card--diagnostic .trace-card__meta span { background: #302715; }
+.trace-card__diagnostic-copy { margin: 0; color: #a89a7c; font-size: 10px; line-height: 1.45; }
