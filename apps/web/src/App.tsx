@@ -32,6 +32,8 @@ interface CompanionEntityMetadata {
 
 type TargetMap = Partial<Record<"entity_id" | "device_id" | "area_id" | "floor_id" | "label_id", string[]>>;
 
+type CompanionTargetMetadata = Record<string, Record<string, { name?: string | null }>>;
+
 interface CompanionTraceStep {
   path: string;
   occurrence?: number;
@@ -148,6 +150,7 @@ export function App() {
   const [exporting, setExporting] = useState<GraphExportFormat | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const [entityMetadata, setEntityMetadata] = useState<Record<string, CompanionEntityMetadata>>({});
+  const [targetMetadata, setTargetMetadata] = useState<CompanionTargetMetadata>({});
   const [automationReferences, setAutomationReferences] = useState<Record<string, string[]>>({});
   const [trace, setTrace] = useState<CompanionTrace | null>(null);
   const [triggerDiagnostic, setTriggerDiagnostic] = useState<CompanionTrace | null>(null);
@@ -178,6 +181,7 @@ export function App() {
         nonce?: string;
         config?: unknown;
         entityMetadata?: Record<string, CompanionEntityMetadata>;
+        targetMetadata?: CompanionTargetMetadata;
         automationReferences?: Record<string, string[]>;
         trace?: CompanionTrace | null;
         triggerDiagnostic?: CompanionTrace | null;
@@ -196,6 +200,15 @@ export function App() {
         ? Object.fromEntries(Object.entries(message.automationReferences).slice(0, 20).map(([key, ids]) => [key, Array.isArray(ids) ? ids.filter((id): id is string => typeof id === "string").slice(0, 5000) : []]))
         : {};
       setEntityMetadata(metadata);
+      const targets = message.targetMetadata && typeof message.targetMetadata === "object"
+        ? Object.fromEntries(Object.entries(message.targetMetadata).slice(0, 10).map(([kind, values]) => [
+            kind,
+            values && typeof values === "object"
+              ? Object.fromEntries(Object.entries(values).slice(0, 5000).map(([id, value]) => [id, value && typeof value === "object" ? { name: typeof value.name === "string" ? value.name.slice(0, 300) : null } : {}]))
+              : {},
+          ]))
+        : {};
+      setTargetMetadata(targets);
       setAutomationReferences(references);
       setTrace(message.trace && typeof message.trace === "object" ? message.trace : null);
       setTriggerDiagnostic(message.triggerDiagnostic && typeof message.triggerDiagnostic === "object" ? message.triggerDiagnostic : null);
@@ -435,7 +448,7 @@ export function App() {
           <div className="tagline">See what your Home Assistant automation can do.</div>
         </div>
         <div className="topbar__actions">
-          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setBaselineYaml(sampleAutomation); setEntityMetadata({}); setAutomationReferences({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); }}>Load example</button>
+          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setBaselineYaml(sampleAutomation); setEntityMetadata({}); setTargetMetadata({}); setAutomationReferences({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); }}>Load example</button>
           <button className="ghost" disabled={!result.ok} onClick={() => void copyMermaid()}>{copyStatus === "copied" ? "Mermaid copied ✓" : copyStatus === "failed" ? "Copy failed" : "Copy Mermaid"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("svg")}>{exporting === "svg" ? "Exporting…" : "Export SVG"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
@@ -458,7 +471,7 @@ export function App() {
               </button>
             </div>
           </div>
-          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setAutomationReferences({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
+          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setTargetMetadata({}); setAutomationReferences({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
         </aside>
 
         <section className="graph-panel panel">
@@ -726,10 +739,14 @@ export function App() {
                     target.ids.map((id) => {
                       const relatedKey = target.kind;
                       const confirmed = (automationReferences[relatedKey] ?? []).includes(id);
+                      const targetName = targetMetadata[target.kind]?.[id]?.name || id;
                       return (
                         <div className="target-card" key={`${target.kind}:${id}`}>
                           <span className={`target-card__kind target-card__kind--${target.kind}`}>{target.kind}</span>
-                          <code>{id}</code>
+                          <span className="target-card__identity">
+                            <strong>{targetName}</strong>
+                            {targetName !== id && <code>{id}</code>}
+                          </span>
                           {confirmed && <small title="Also resolved by Home Assistant search/related">HA resolved</small>}
                         </div>
                       );

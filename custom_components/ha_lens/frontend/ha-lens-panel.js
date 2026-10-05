@@ -416,18 +416,20 @@ class HaLensPanel extends HTMLElement {
   }
 
   async _registryData() {
-    if (!this._hass?.callWS) return { areas: [], devices: [], entities: [] };
+    if (!this._hass?.callWS) return { areas: [], devices: [], entities: [], floors: [], labels: [] };
 
     if (!this._registryPromise) {
       this._registryPromise = Promise.all([
         this._hass.callWS({ type: "config/area_registry/list" }),
         this._hass.callWS({ type: "config/device_registry/list" }),
         this._hass.callWS({ type: "config/entity_registry/list" }),
+        this._hass.callWS({ type: "config/floor_registry/list" }),
+        this._hass.callWS({ type: "config/label_registry/list" }),
       ])
-        .then(([areas, devices, entities]) => ({ areas, devices, entities }))
+        .then(([areas, devices, entities, floors, labels]) => ({ areas, devices, entities, floors, labels }))
         .catch((error) => {
           console.warn("HA Lens could not load registry metadata", error);
-          return { areas: [], devices: [], entities: [] };
+          return { areas: [], devices: [], entities: [], floors: [], labels: [] };
         });
     }
 
@@ -622,12 +624,12 @@ class HaLensPanel extends HTMLElement {
     return null;
   }
 
-  async _entityMetadata(config, related = {}) {
+  async _entityMetadata(config, related = {}, registryData = null) {
     const entityIds = this._collectEntityIds(config);
     for (const entityId of related?.entity || []) {
       if (typeof entityId === "string") entityIds.add(entityId);
     }
-    const { areas, devices, entities } = await this._registryData();
+    const { areas, devices, entities } = registryData || await this._registryData();
 
     const areasById = new Map(areas.map((area) => [area.area_id, area]));
     const devicesById = new Map(devices.map((device) => [device.id, device]));
@@ -663,6 +665,65 @@ class HaLensPanel extends HTMLElement {
     return Object.fromEntries(entries);
   }
 
+  _targetIds(config, related = {}) {
+    const kinds = {
+      entity: new Set(related?.entity || []),
+      device: new Set(related?.device || []),
+      area: new Set(related?.area || []),
+      floor: new Set(related?.floor || []),
+      label: new Set(related?.label || []),
+    };
+    const keyMap = {
+      entity_id: "entity",
+      device_id: "device",
+      area_id: "area",
+      floor_id: "floor",
+      label_id: "label",
+    };
+    const visit = (value) => {
+      if (Array.isArray(value)) {
+        value.forEach(visit);
+        return;
+      }
+      if (!value || typeof value !== "object") return;
+      for (const [key, child] of Object.entries(value)) {
+        const kind = keyMap[key];
+        if (kind) {
+          const values = Array.isArray(child) ? child : [child];
+          for (const id of values) {
+            if (typeof id === "string" && id.length <= 300) kinds[kind].add(id);
+          }
+        }
+        visit(child);
+      }
+    };
+    visit(config);
+    return kinds;
+  }
+
+  _targetMetadata(config, related, registryData, entityMetadata) {
+    const ids = this._targetIds(config, related);
+    const areas = new Map((registryData?.areas || []).map((item) => [item.area_id, item]));
+    const devices = new Map((registryData?.devices || []).map((item) => [item.id, item]));
+    const floors = new Map((registryData?.floors || []).map((item) => [item.floor_id, item]));
+    const labels = new Map((registryData?.labels || []).map((item) => [item.label_id, item]));
+    const output = {};
+    const add = (kind, id, name) => {
+      output[kind] ||= {};
+      output[kind][id] = { name: this._compactString(name || id, 300) };
+    };
+
+    for (const id of [...ids.entity].slice(0, 5000)) add("entity", id, entityMetadata?.[id]?.name || id);
+    for (const id of [...ids.device].slice(0, 5000)) {
+      const item = devices.get(id);
+      add("device", id, item?.name_by_user || item?.name || id);
+    }
+    for (const id of [...ids.area].slice(0, 5000)) add("area", id, areas.get(id)?.name || id);
+    for (const id of [...ids.floor].slice(0, 5000)) add("floor", id, floors.get(id)?.name || id);
+    for (const id of [...ids.label].slice(0, 5000)) add("label", id, labels.get(id)?.name || id);
+    return output;
+  }
+
   async _loadAutomation(entityId) {
     if (!this._hass?.callWS) {
       this._setStatus("Home Assistant WebSocket API is unavailable.", true);
@@ -675,11 +736,13 @@ class HaLensPanel extends HTMLElement {
       const selected = this._automations().find((automation) => automation.entityId === entityId);
       const config = await this._automationConfig(entityId);
       const automationId = config?.id != null ? String(config.id) : null;
-      const [related, traces] = await Promise.all([
+      const [related, traces, registryData] = await Promise.all([
         this._automationRelated(entityId),
         this._latestTraces({ automationId }),
+        this._registryData(),
       ]);
-      const entityMetadata = await this._entityMetadata(config, related);
+      const entityMetadata = await this._entityMetadata(config, related, registryData);
+      const targetMetadata = this._targetMetadata(config, related, registryData, entityMetadata);
 
       this._pendingMessage = {
         type: "ha-lens:automation",
@@ -687,6 +750,7 @@ class HaLensPanel extends HTMLElement {
         entityId,
         config,
         entityMetadata,
+        targetMetadata,
         automationReferences: related,
         trace: traces.execution,
         triggerDiagnostic: traces.diagnostic,

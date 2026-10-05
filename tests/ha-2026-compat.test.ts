@@ -199,5 +199,8 @@ describe("Home Assistant companion 2026 trace contract", () => {
     expect(panel).toContain("entry?.result?.params?.target ?? entry?.result?.target");
     expect(panel).toContain('type: "automation/config"');
     expect(panel).toContain('type: "search/related"');
+    expect(panel).toContain('type: "config/floor_registry/list"');
+    expect(panel).toContain('type: "config/label_registry/list"');
+    expect(panel).toContain("targetMetadata");
   });
 });
