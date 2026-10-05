@@ -12,7 +12,8 @@
     "http",
     "panel_custom",
     "automation",
-    "websocket_api"
+    "search",
+    "config"
   ],
   "documentation": "https://github.com/Manantra/ha-lens",
   "issue_tracker": "https://github.com/Manantra/ha-lens/issues",
