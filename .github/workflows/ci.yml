@@ -28,6 +28,14 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Dependency security audit
         run: npm audit --audit-level=high
+      - name: Generate CycloneDX SBOM
+        run: npm sbom --sbom-format cyclonedx > sbom.cdx.json
+      - name: Upload SBOM
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ha-lens-sbom
+          path: sbom.cdx.json
+          if-no-files-found: error
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
