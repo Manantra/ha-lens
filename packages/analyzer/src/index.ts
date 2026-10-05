@@ -41,7 +41,7 @@ function countCondition(condition: ConditionNode): { count: number; decisions: n
   const nested = children.map(countCondition);
   return {
     count: 1 + nested.reduce((sum, value) => sum + value.count, 0),
-    decisions: 1 + nested.reduce((sum, value) => sum + value.decisions, 0),
+    decisions: (condition.raw.enabled === false ? 0 : 1) + nested.reduce((sum, value) => sum + value.decisions, 0),
     depth: 1 + Math.max(0, ...nested.map((value) => value.depth)),
   };
 }
@@ -62,6 +62,10 @@ function inspectSequence(items: SequenceItem[], depth = 1): {
   for (const item of items) {
     actions += 1;
     maxDepth = Math.max(maxDepth, depth);
+    if (item.raw.enabled === false) {
+      insights.push({ level: "info", nodeId: item.id, message: "This step is disabled in Home Assistant and is excluded from execution-path semantics." });
+      continue;
+    }
     if (item.kind === "service") calls.push(item.action);
     if (item.kind === "device-action") calls.push(`${item.domain}.${item.actionType} [device]`);
     if (item.kind === "unknown") insights.push({ level: "warning", nodeId: item.id, message: "Unsupported syntax is kept visible as an unknown node." });
@@ -280,17 +284,30 @@ function summarizeSequence(items: SequenceItem[]): string {
 export function explainAutomation(automation: AutomationModel): string[] {
   const lines: string[] = [];
 
-  if (automation.triggers.length) {
-    lines.push(`Starts when ${automation.triggers.map((trigger) => trigger.summary).join(" or ")}.`);
+  const enabledTriggers = automation.triggers.filter((trigger) => trigger.raw.enabled !== false);
+  if (enabledTriggers.length) {
+    lines.push(`Starts when ${enabledTriggers.map((trigger) => trigger.summary).join(" or ")}.`);
+    const disabledTriggerCount = automation.triggers.length - enabledTriggers.length;
+    if (disabledTriggerCount) lines.push(`${disabledTriggerCount} configured trigger${disabledTriggerCount === 1 ? " is" : "s are"} disabled in Home Assistant.`);
+  } else if (automation.triggers.length) {
+    lines.push("All configured triggers are disabled in Home Assistant, so this automation cannot start from them.");
   } else {
     lines.push("Has no explicit trigger in the pasted YAML, so the flow begins manually or from an unspecified source.");
   }
 
-  if (automation.conditions.length) {
-    lines.push(`Before actions run, every top-level condition must pass: ${automation.conditions.map((condition) => condition.summary).join("; ")}.`);
+  const enabledConditions = automation.conditions.filter((condition) => condition.raw.enabled !== false);
+  if (enabledConditions.length) {
+    lines.push(`Before actions run, every enabled top-level condition must pass: ${enabledConditions.map((condition) => condition.summary).join("; ")}.`);
+  }
+  if (automation.conditions.some((condition) => condition.raw.enabled === false)) {
+    lines.push("Disabled top-level conditions are skipped by Home Assistant and excluded from HA Lens execution paths.");
   }
 
   for (const item of automation.actions) {
+    if (item.raw.enabled === false) {
+      lines.push(`${item.summary} is disabled in Home Assistant and is skipped during execution.`);
+      continue;
+    }
     if (item.kind === "service") {
       lines.push(`Then it calls ${item.summary}.`);
     } else if (item.kind === "device-action") {

@@ -1064,3 +1064,8 @@ button.ghost { background: transparent; color: #dce3f5; }
 .trace-card--diagnostic span { color: #b9a16f; }
 .trace-card--diagnostic .trace-card__meta span { background: #302715; }
 .trace-card__diagnostic-copy { margin: 0; color: #a89a7c; font-size: 10px; line-height: 1.45; }
+
+
+/* Disabled Home Assistant automation elements */
+.lens-node.is-disabled { opacity: .48; border-style: dashed; filter: saturate(.55); }
+.lens-node__disabled-badge { flex: 0 0 auto; border: 1px solid #555f70; border-radius: 999px; padding: 2px 6px; color: #a7b0bf; background: #1a1f29; font-size: 8px; font-weight: 850; text-transform: lowercase; }

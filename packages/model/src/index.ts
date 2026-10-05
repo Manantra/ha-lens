@@ -167,6 +167,7 @@ export interface GraphNode {
   kind: "trigger" | "condition" | "action" | "control" | "wait" | "loop" | "parallel" | "stop" | "merge" | "unknown" | "end";
   label: string;
   subtitle?: string;
+  disabled?: boolean;
 }
 
 export interface GraphEdge {

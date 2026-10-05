@@ -37,8 +37,30 @@ class Builder {
     for (const item of items) {
       if (!incoming.length) break;
 
+      if (item.raw.enabled === false) {
+        const disabledKind: GraphNode["kind"] = item.kind === "inline-condition"
+          ? "condition"
+          : item.kind === "if" || item.kind === "choose"
+            ? "control"
+            : item.kind === "repeat"
+              ? "loop"
+              : item.kind === "parallel"
+                ? "parallel"
+                : item.kind === "wait"
+                  ? "wait"
+                  : item.kind === "stop"
+                    ? "stop"
+                    : item.kind === "unknown"
+                      ? "unknown"
+                      : "action";
+        this.node({ id: item.id, kind: disabledKind, label: item.summary, subtitle: "Disabled in Home Assistant", disabled: true });
+        this.connect(incoming, item.id);
+        incoming = [{ id: item.id, label: "disabled / skipped" }];
+        continue;
+      }
+
       if (item.kind === "service") {
-        this.node({ id: item.id, kind: "action", label: item.summary, subtitle: item.action });
+        this.node({ id: item.id, kind: "action", label: item.summary, subtitle: item.action, disabled: item.raw.enabled === false });
         this.connect(incoming, item.id);
         incoming = [{ id: item.id }];
       } else if (item.kind === "device-action") {
@@ -47,16 +69,17 @@ class Builder {
           kind: "action",
           label: item.summary,
           subtitle: `Device action · ${item.domain}`,
+          disabled: item.raw.enabled === false,
         });
         this.connect(incoming, item.id);
         incoming = [{ id: item.id }];
       } else if (item.kind === "inline-condition") {
-        this.node({ id: item.id, kind: "condition", label: item.summary });
+        this.node({ id: item.id, kind: "condition", label: item.summary, disabled: item.raw.enabled === false });
         this.connect(incoming, item.id);
         this.stop([{ id: item.id, label: "false" }], "Condition failed");
         incoming = [{ id: item.id, label: "true" }];
       } else if (item.kind === "if") {
-        this.node({ id: item.id, kind: "control", label: item.summary, subtitle: item.conditions.map((condition) => condition.summary).join(" · ") || "No conditions" });
+        this.node({ id: item.id, kind: "control", label: item.summary, subtitle: item.conditions.map((condition) => condition.raw.enabled === false ? `[disabled] ${condition.summary}` : condition.summary).join(" · ") || "No conditions", disabled: item.raw.enabled === false });
         this.connect(incoming, item.id);
         const thenOut = item.then.length ? this.buildSequence(item.then, [{ id: item.id, label: "true" }]) : [{ id: item.id, label: "true" }];
         const elseOut = item.else.length ? this.buildSequence(item.else, [{ id: item.id, label: "false" }]) : [{ id: item.id, label: "false" }];
@@ -65,7 +88,7 @@ class Builder {
         this.connect(elseOut, merge);
         incoming = [{ id: merge }];
       } else if (item.kind === "choose") {
-        this.node({ id: item.id, kind: "control", label: item.summary, subtitle: "First matching option wins" });
+        this.node({ id: item.id, kind: "control", label: item.summary, subtitle: "First matching option wins", disabled: item.raw.enabled === false });
         this.connect(incoming, item.id);
         const branchOut: Incoming[] = [];
         item.choices.forEach((choice, index) => {
@@ -79,7 +102,7 @@ class Builder {
         this.connect(branchOut, merge);
         incoming = [{ id: merge }];
       } else if (item.kind === "repeat") {
-        this.node({ id: item.id, kind: "loop", label: item.summary, subtitle: "Symbolic loop" });
+        this.node({ id: item.id, kind: "loop", label: item.summary, subtitle: "Symbolic loop", disabled: item.raw.enabled === false });
         this.connect(incoming, item.id);
         if (item.sequence.length) {
           const loopOut = this.buildSequence(item.sequence, [{ id: item.id, label: "loop" }]);
@@ -87,7 +110,7 @@ class Builder {
         }
         incoming = [{ id: item.id, label: "continue" }];
       } else if (item.kind === "parallel") {
-        this.node({ id: item.id, kind: "parallel", label: item.summary });
+        this.node({ id: item.id, kind: "parallel", label: item.summary, disabled: item.raw.enabled === false });
         this.connect(incoming, item.id);
         const merge = this.virtual("merge", "Join parallel branches");
         item.branches.forEach((branch, index) => {
@@ -96,12 +119,12 @@ class Builder {
         });
         incoming = [{ id: merge }];
       } else if (item.kind === "stop") {
-        this.node({ id: item.id, kind: "stop", label: item.summary });
+        this.node({ id: item.id, kind: "stop", label: item.summary, disabled: item.raw.enabled === false });
         this.connect(incoming, item.id);
         incoming = [];
       } else {
         const kind: GraphNode["kind"] = item.kind === "wait" ? "wait" : item.kind === "unknown" ? "unknown" : "action";
-        this.node({ id: item.id, kind, label: item.summary, subtitle: item.kind === "wait" && item.timeout != null ? `timeout: ${String(item.timeout)}` : undefined });
+        this.node({ id: item.id, kind, label: item.summary, subtitle: item.kind === "wait" && item.timeout != null ? `timeout: ${String(item.timeout)}` : undefined, disabled: item.raw.enabled === false });
         this.connect(incoming, item.id);
         if (item.kind === "wait" && item.timeout != null && !item.continueOnTimeout) this.stop([{ id: item.id, label: "timeout" }], "Timeout");
         incoming = [{ id: item.id, label: item.kind === "wait" && item.timeout != null ? "completed" : undefined }];
@@ -117,7 +140,7 @@ export function buildAutomationGraph(automation: AutomationModel): AutomationGra
 
   if (automation.triggers.length) {
     automation.triggers.forEach((trigger) => {
-      builder.node({ id: trigger.id, kind: "trigger", label: trigger.alias || trigger.summary, subtitle: trigger.triggerType });
+      builder.node({ id: trigger.id, kind: "trigger", label: trigger.alias || trigger.summary, subtitle: trigger.triggerType, disabled: trigger.raw.enabled === false });
     });
     incoming = automation.triggers.map((trigger) => ({ id: trigger.id }));
   } else {
@@ -126,10 +149,15 @@ export function buildAutomationGraph(automation: AutomationModel): AutomationGra
   }
 
   for (const condition of automation.conditions) {
-    builder.node({ id: condition.id, kind: "condition", label: condition.alias || condition.summary, subtitle: condition.conditionType });
+    const disabled = condition.raw.enabled === false;
+    builder.node({ id: condition.id, kind: "condition", label: condition.alias || condition.summary, subtitle: condition.conditionType, disabled });
     builder.connect(incoming, condition.id);
-    builder.stop([{ id: condition.id, label: "false" }], "Condition failed");
-    incoming = [{ id: condition.id, label: "true" }];
+    if (disabled) {
+      incoming = [{ id: condition.id, label: "disabled / skipped" }];
+    } else {
+      builder.stop([{ id: condition.id, label: "false" }], "Condition failed");
+      incoming = [{ id: condition.id, label: "true" }];
+    }
   }
 
   incoming = builder.buildSequence(automation.actions, incoming);

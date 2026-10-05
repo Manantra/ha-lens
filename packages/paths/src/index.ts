@@ -21,6 +21,7 @@ function expandSequence(items: SequenceItem[], input: PathState[], maxPaths: num
   let states = input;
 
   for (const item of items) {
+    if (item.raw.enabled === false) continue;
     const next: PathState[] = [];
     for (const state of states) {
       if (state.terminal) {
@@ -106,13 +107,15 @@ function pathTitle(state: PathState, index: number): string {
 }
 
 export function enumerateExecutionPaths(automation: AutomationModel, maxPaths = 64): ExecutionPath[] {
+  const enabledTriggers = automation.triggers.filter((trigger) => trigger.raw.enabled !== false);
   const triggerStates: PathState[] = automation.triggers.length
-    ? automation.triggers.map((trigger) => ({ steps: [{ nodeId: trigger.id, label: trigger.summary }], terminal: false }))
+    ? enabledTriggers.map((trigger) => ({ steps: [{ nodeId: trigger.id, label: trigger.summary }], terminal: false }))
     : [{ steps: [{ nodeId: "manual", label: "Manual / unspecified trigger" }], terminal: false }];
 
   let active = triggerStates;
   const terminal: PathState[] = [];
   for (const condition of automation.conditions) {
+    if (condition.raw.enabled === false) continue;
     const nextActive: PathState[] = [];
     for (const state of active) {
       nextActive.push(cloneWith(state, { nodeId: condition.id, label: `${condition.summary} → true` }));

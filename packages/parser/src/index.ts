@@ -17,6 +17,30 @@ const asList = <T = unknown>(value: unknown): T[] => {
   return (Array.isArray(value) ? value : [value]) as T[];
 };
 
+const isDisabled = (raw: UnknownRecord): boolean => raw.enabled === false;
+
+function flattenTriggerRecords(value: unknown): UnknownRecord[] {
+  const output: UnknownRecord[] = [];
+  for (const entry of asList(value)) {
+    const raw = asRecord(entry);
+    if (raw.triggers != null && raw.trigger == null && raw.platform == null) {
+      output.push(...flattenTriggerRecords(raw.triggers));
+      continue;
+    }
+    output.push(raw);
+  }
+  return output;
+}
+
+function normalizeConditionRecord(value: unknown): UnknownRecord {
+  const raw = asRecord(value);
+  if (raw.condition != null) return raw;
+  if (raw.and != null) return { ...raw, condition: "and", conditions: raw.and };
+  if (raw.or != null) return { ...raw, condition: "or", conditions: raw.or };
+  if (raw.not != null) return { ...raw, condition: "not", conditions: raw.not };
+  return raw;
+}
+
 const stringValue = (value: unknown, fallback: string) =>
   typeof value === "string" && value.trim() ? value : fallback;
 
@@ -151,7 +175,7 @@ function parseCondition(value: unknown, id: string): ConditionNode {
     };
   }
 
-  const raw = asRecord(value);
+  const raw = normalizeConditionRecord(value);
   const conditionType = stringValue(raw.condition, "unknown");
   const children = ["and", "or", "not"].includes(conditionType)
     ? asList(raw.conditions).map((condition, index) => parseCondition(condition, `${id}.conditions.${index}`))
@@ -365,8 +389,8 @@ export function parseAutomationYaml(source: string): ParseResult {
   const conditionValues = raw.conditions ?? raw.condition;
   const actionValues = raw.actions ?? raw.action;
 
-  const triggers: TriggerNode[] = asList(triggerValues).map((trigger, index) => {
-    const triggerRaw = asRecord(trigger);
+  const flattenedTriggerRecords = flattenTriggerRecords(triggerValues);
+  const triggers: TriggerNode[] = flattenedTriggerRecords.map((triggerRaw, index) => {
     const triggerType = stringValue(triggerRaw.trigger ?? triggerRaw.platform, "unknown");
     return {
       id: `triggers.${index}`,
@@ -390,6 +414,8 @@ export function parseAutomationYaml(source: string): ParseResult {
   };
 
   if (!triggers.length) warnings.push("No trigger was found. This may be a script-like sequence or manually invoked automation.");
+  if (triggers.some((trigger) => isDisabled(trigger.raw))) warnings.push("One or more triggers are disabled and are excluded from execution paths.");
+  if (automation.conditions.some((condition) => isDisabled(condition.raw))) warnings.push("One or more top-level conditions are disabled and are skipped during path analysis.");
   return { automation, warnings };
 }
 

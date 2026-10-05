@@ -39,7 +39,7 @@ export function LensNode({ data, selected }: NodeProps) {
   const entityIcons = node.entityIcons ?? [];
 
   return (
-    <div className={`lens-node lens-node--${node.kind} ${selected ? "is-selected" : ""}`}>
+    <div className={`lens-node lens-node--${node.kind} ${node.disabled ? "is-disabled" : ""} ${selected ? "is-selected" : ""}`}>
       <Handle type="target" position={Position.Top} />
       <div className="lens-node__topline">
         <div className="lens-node__kind-row">
@@ -47,6 +47,7 @@ export function LensNode({ data, selected }: NodeProps) {
           <NodeEntityIcons icons={entityIcons} />
         </div>
         <div className="lens-node__badges">
+          {node.disabled && <div className="lens-node__disabled-badge">disabled</div>}
           {node.diffStatus && (
             <div className={`lens-node__diff-badge lens-node__diff-badge--${node.diffStatus}`}>
               {node.diffStatus === "added" ? "+ added" : node.diffStatus === "removed" ? "− removed" : "~ changed"}
