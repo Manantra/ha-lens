@@ -131,6 +131,34 @@ actions:
     expect(automation.triggers[0].summary).toContain("area: living_room");
   });
 
+  it("surfaces action notes error policy response variables and error stops", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Action metadata
+actions:
+  - action: weather.get_forecasts
+    target:
+      entity_id: weather.home
+    response_variable: forecast
+    continue_on_error: true
+    note: Keep going if forecast lookup fails
+  - stop: Forecast failed
+    error: true
+`);
+
+    const graph = buildAutomationGraph(automation);
+    const service = graph.nodes.find((node) => node.id === "actions.0");
+    expect(service?.subtitle).toContain("Continue on error");
+    expect(service?.subtitle).toContain("Response → forecast");
+    expect(service?.subtitle).toContain("Note: Keep going if forecast lookup fails");
+    const stop = graph.nodes.find((node) => node.id === "actions.1");
+    expect(stop?.subtitle).toContain("Stops with error");
+
+    const analysis = analyzeAutomation(automation);
+    expect(analysis.insights.some((insight) => insight.nodeId === "actions.0" && insight.message.includes("continue"))).toBe(true);
+    expect(analysis.insights.some((insight) => insight.nodeId === "actions.0" && insight.message.includes("forecast"))).toBe(true);
+    expect(analysis.insights.some((insight) => insight.nodeId === "actions.1" && insight.level === "warning")).toBe(true);
+  });
+
   it("parses nested sequence, event, conversation response, and service_template actions", () => {
     const { automation } = parseAutomationYaml(`
 alias: New action forms

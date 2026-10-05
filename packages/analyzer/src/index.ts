@@ -62,6 +62,18 @@ function inspectSequence(items: SequenceItem[], depth = 1): {
   for (const item of items) {
     actions += 1;
     maxDepth = Math.max(maxDepth, depth);
+    if (typeof item.raw.note === "string" && item.raw.note.trim()) {
+      insights.push({ level: "info", nodeId: item.id, message: `Editor note: ${item.raw.note.trim()}` });
+    }
+    if (item.raw.continue_on_error === true) {
+      insights.push({ level: "info", nodeId: item.id, message: "Home Assistant will continue to the next step if this action raises an error." });
+    }
+    if (typeof item.raw.response_variable === "string" && item.raw.response_variable.trim()) {
+      insights.push({ level: "info", nodeId: item.id, message: `Response data is stored in variable ${item.raw.response_variable.trim()}.` });
+    }
+    if (item.kind === "stop" && item.raw.error === true) {
+      insights.push({ level: "warning", nodeId: item.id, message: "This stop action terminates the sequence as an error." });
+    }
     if (item.raw.enabled === false) {
       insights.push({ level: "info", nodeId: item.id, message: "This step is disabled in Home Assistant and is excluded from execution-path semantics." });
       continue;
