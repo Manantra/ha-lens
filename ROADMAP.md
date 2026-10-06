@@ -4,6 +4,8 @@
 
 v0.1.35 completes the Home Assistant 2026 compatibility and security-hardening pass.
 
+Current prerelease: **v0.1.36-beta.1**, adding readable nested runtime breadcrumbs.
+
 ### Visual inspection
 
 - [x] YAML input and semantic parser
