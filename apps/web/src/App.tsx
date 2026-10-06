@@ -17,6 +17,7 @@ import {
 import { sampleAutomation } from "./sample";
 import { buildAutomationDiff } from "./automationDiff";
 import { createAutomationSnapshot, parseAutomationSnapshot, serializeAutomationSnapshot, snapshotFilename } from "./snapshot";
+import { lintAutomation } from "./lint";
 import {
   sanitizeAutomationReferences,
   sanitizeCompanionTrace,
@@ -27,7 +28,7 @@ import {
   type TargetMap,
 } from "./companionPayload";
 
-type Tab = "summary" | "paths" | "entities" | "diff" | "trace" | "insights" | "explain";
+type Tab = "summary" | "paths" | "entities" | "diff" | "trace" | "insights" | "lint" | "explain";
 type GraphFitMode = "all" | "width";
 
 interface CompanionEntityMetadata {
@@ -146,6 +147,7 @@ export function App() {
   const [showTrace, setShowTrace] = useState(false);
   const [selectedTraceNodeId, setSelectedTraceNodeId] = useState<string | null>(null);
   const [selectedDiffNodeId, setSelectedDiffNodeId] = useState<string | null>(null);
+  const [lintEnabled, setLintEnabled] = useState(false);
   const embedded = useMemo(() => new URLSearchParams(window.location.search).get("embedded") === "1", []);
   const channelNonce = useMemo(() => new URLSearchParams(window.location.search).get("channel"), []);
 
@@ -197,6 +199,7 @@ export function App() {
       setSelectedEntity(null);
       setSelectedTraceNodeId(null);
       setSelectedDiffNodeId(null);
+      setLintEnabled(false);
       setTab("summary");
     };
 
@@ -323,9 +326,14 @@ export function App() {
 
   const tabs = useMemo<Tab[]>(
     () => inspectorTrace
-      ? ["summary", "paths", "entities", "diff", "trace", "insights", "explain"]
-      : ["summary", "paths", "entities", "diff", "insights", "explain"],
+      ? ["summary", "paths", "entities", "diff", "trace", "insights", "lint", "explain"]
+      : ["summary", "paths", "entities", "diff", "insights", "lint", "explain"],
     [inspectorTrace],
+  );
+
+  const lintIssues = useMemo(
+    () => result.ok && lintEnabled ? lintAutomation(result.automation) : [],
+    [lintEnabled, result],
   );
 
   const sortedEntities = useMemo(() => {
@@ -448,6 +456,7 @@ export function App() {
     setSelectedDiffNodeId(null);
     setSelectedPath(null);
     setSelectedEntity(null);
+    setLintEnabled(false);
   }
 
   function exportSnapshot() {
@@ -516,7 +525,7 @@ export function App() {
           <div className="tagline">See what your Home Assistant automation can do.</div>
         </div>
         <div className="topbar__actions">
-          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setBaselineYaml(sampleAutomation); setEntityMetadata({}); setTargetMetadata({}); setAutomationReferences({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); }}>Load example</button>
+          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setBaselineYaml(sampleAutomation); setEntityMetadata({}); setTargetMetadata({}); setAutomationReferences({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); setLintEnabled(false); }}>Load example</button>
           <button className="ghost" disabled={!result.ok} onClick={() => void copyMermaid()}>{copyStatus === "copied" ? "Mermaid copied ✓" : copyStatus === "failed" ? "Copy failed" : "Copy Mermaid"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("svg")}>{exporting === "svg" ? "Exporting…" : "Export SVG"}</button>
           <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
@@ -548,7 +557,7 @@ export function App() {
               </button>
             </div>
           </div>
-          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setTargetMetadata({}); setAutomationReferences({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); setSelectedPath(null); setSelectedEntity(null); }} spellCheck={false} />
+          <textarea wrap="off" value={yaml} onChange={(event) => { setYaml(event.target.value); setEntityMetadata({}); setTargetMetadata({}); setAutomationReferences({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); setSelectedPath(null); setSelectedEntity(null); setLintEnabled(false); }} spellCheck={false} />
         </aside>
 
         <section className="graph-panel panel">
@@ -1014,6 +1023,39 @@ export function App() {
                 <div className="section-intro">These are structural observations, not validation errors.</div>
                 {result.analysis.insights.length ? result.analysis.insights.map((insight, index) => <div className={`insight insight--${insight.level}`} key={`${insight.nodeId}-${index}`}>{insight.message}</div>) : <div className="empty-state">No structural insights for this automation.</div>}
               </>
+            ) : tab === "lint" ? (
+              <div className="lint-panel">
+                <div className="section-intro">Optional static checks. Lint findings are advisory HA Lens observations, not Home Assistant validation errors.</div>
+                {!lintEnabled ? (
+                  <div className="lint-opt-in">
+                    <strong>Lint checks are off</strong>
+                    <span>Run conservative structural checks only when you want them.</span>
+                    <button onClick={() => setLintEnabled(true)}>Run lint checks</button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="lint-toolbar">
+                      <span>{lintIssues.length} finding{lintIssues.length === 1 ? "" : "s"}</span>
+                      <button className="ghost" onClick={() => setLintEnabled(false)}>Clear lint results</button>
+                    </div>
+                    {lintIssues.length ? (
+                      <div className="lint-list">
+                        {lintIssues.map((issue, index) => (
+                          <div className={`lint-issue lint-issue--${issue.severity}`} key={`${issue.ruleId}-${issue.nodeId || index}`}>
+                            <span className="lint-issue__id">{issue.ruleId}</span>
+                            <span className="lint-issue__body">
+                              <strong>{issue.title}</strong>
+                              <small>{issue.detail}</small>
+                            </span>
+                            <span className="lint-issue__severity">{issue.severity}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : <div className="diff-empty"><strong>No lint findings</strong><span>None of the enabled HA Lens advisory rules matched this automation.</span></div>}
+                    <p className="privacy">Lint runs locally and does not replace Home Assistant configuration validation.</p>
+                  </>
+                )}
+              </div>
             ) : (
               <>
                 <div className="section-intro">A deterministic explanation generated from the parsed automation structure. No AI or cloud processing is used.</div>

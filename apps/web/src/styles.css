@@ -1095,3 +1095,22 @@ button.ghost { background: transparent; color: #dce3f5; }
 .trace-step__targets { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
 .trace-step__targets small { display: inline-flex; min-width: 0; gap: 4px; align-items: center; border: 1px solid #35435a; border-radius: 999px; padding: 2px 5px; color: #a9b7ce; background: #151d29; font-size: 8px; overflow-wrap: anywhere; }
 .trace-step__targets b { color: #7184a5; font-size: 7px; text-transform: uppercase; }
+
+
+/* Optional lint */
+.lint-panel { display: flex; flex-direction: column; gap: 12px; }
+.lint-opt-in { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; padding: 14px; border: 1px dashed #3a4558; border-radius: 11px; background: #131821; }
+.lint-opt-in strong { color: #d7dfed; font-size: 12px; }
+.lint-opt-in span { color: #7f8ba0; font-size: 9px; line-height: 1.45; }
+.lint-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; color: #8794aa; font-size: 9px; }
+.lint-toolbar button { padding: 5px 7px; font-size: 9px; }
+.lint-list { display: flex; flex-direction: column; gap: 7px; }
+.lint-issue { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: start; gap: 8px; padding: 9px 10px; border: 1px solid #30394a; border-radius: 10px; background: #141923; }
+.lint-issue--warning { border-color: #6e5630; background: #211b12; }
+.lint-issue__id { padding: 2px 5px; border: 1px solid #414c60; border-radius: 999px; color: #8fa0bb; font: 800 7.5px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.lint-issue--warning .lint-issue__id { border-color: #7d6237; color: #e0bb72; }
+.lint-issue__body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.lint-issue__body strong { color: #dce4f2; font-size: 10.5px; line-height: 1.3; }
+.lint-issue__body small { color: #8794a9; font-size: 8.5px; line-height: 1.45; overflow-wrap: anywhere; }
+.lint-issue__severity { color: #6f7d94; font-size: 7px; font-weight: 850; text-transform: uppercase; }
+.lint-issue--warning .lint-issue__severity { color: #d5ad61; }
