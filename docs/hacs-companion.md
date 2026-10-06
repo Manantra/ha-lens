@@ -13,8 +13,10 @@ The HA Lens companion is intentionally read-only and admin-only.
 - Resolves native Home Assistant entity icons and passes only SVG path data to the viewer.
 - Loads the latest real automation execution and the latest `not_triggered` trigger diagnostic separately.
 - Shows resolved runtime service targets from the Home Assistant trace where available.
-- Provides the Trace inspector, Structure/Last run coverage, repeat iteration counts and parallel branch coverage.
+- Provides the Trace inspector, Structure/Last run coverage, readable runtime breadcrumbs, repeat iteration counts and parallel branch coverage.
 - Captures a local Diff baseline and compares local YAML edits without registering any write command.
+- Saves and opens local HA Lens snapshots containing only automation YAML plus minimal snapshot metadata; traces and registry metadata are not exported.
+- Offers opt-in local lint checks whose findings are advisory and separate from Home Assistant validation.
 - Does not register a Home Assistant action/service that can modify or execute an automation.
 
 ## Architecture

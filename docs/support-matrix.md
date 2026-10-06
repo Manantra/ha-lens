@@ -44,11 +44,14 @@ HA Lens is a static, read-only analyzer. “Supported” means a construct is pr
 | Latest execution | Latest trace whose summary is not `not_triggered` |
 | Trigger diagnostic | Latest `not_triggered` trace shown separately and never used as Last run execution coverage |
 | Runtime targets | Resolved service-call targets from trace `result.params.target` when available |
+| Runtime breadcrumbs | Nested `if`, `choose`, repeat, parallel and sequence context derived only from the actual Home Assistant trace path |
 | Structure vs. Last run | Complete static graph vs conservative execution coverage |
 | Branch coverage | Taken branches green; known sibling non-taken branches orange/dashed; unreached graph dimmed |
 | Repeat runtime coverage | Observed iteration count and concrete iteration index where available |
 | Parallel runtime coverage | Observed/configured branch counts; only observed branches marked executed |
 | Automation diff | Local baseline comparison for added / changed / removed graph nodes; generated HA trigger IDs do not create false changes |
+| Local snapshots | Versioned local JSON containing automation YAML plus minimal snapshot metadata only; trace and registry metadata are intentionally excluded |
+| Optional lint | User-triggered advisory static checks only; findings never replace Home Assistant validation |
 | Write-back | Not implemented; integration remains read-only |
 
 ## Security and compatibility guardrails
