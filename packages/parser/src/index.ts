@@ -1,4 +1,5 @@
 import { parse, stringify } from "yaml";
+import { getEnablementState } from "@ha-lens/model";
 import type {
   AutomationModel,
   ChooseBranch,
@@ -19,7 +20,8 @@ const asList = <T = unknown>(value: unknown): T[] => {
   return (Array.isArray(value) ? value : [value]) as T[];
 };
 
-const isDisabled = (raw: UnknownRecord): boolean => raw.enabled === false;
+const isDisabled = (raw: UnknownRecord): boolean => getEnablementState(raw) === "disabled";
+const isDynamicEnabled = (raw: UnknownRecord): boolean => getEnablementState(raw) === "dynamic";
 const MAX_NESTING_DEPTH = 64;
 
 function assertSafeDepth(depth: number) {
@@ -114,10 +116,12 @@ function triggerListTargets(value: unknown, depth = 0): TargetReference[] {
 
 function attachConditionTargets(condition: ConditionNode) {
   condition.targets = extractTargets(condition.raw);
+  condition.enablement = getEnablementState(condition.raw);
   condition.children?.forEach(attachConditionTargets);
 }
 
 function attachSequenceTargets(items: SequenceItem[]) {
+  for (const item of items) item.enablement = getEnablementState(item.raw);
   for (const item of items) {
     item.targets = extractTargets(item.raw);
     if (item.kind === "if") {
@@ -604,13 +608,15 @@ export function parseAutomationYaml(source: string): ParseResult {
   automation.conditions.forEach((condition) => resolveTriggerConditionSummary(condition, triggersById));
   resolveSequenceTriggerConditions(automation.actions, triggersById);
 
-  automation.triggers.forEach((trigger) => { trigger.targets = extractTargets(trigger.raw); });
+  automation.triggers.forEach((trigger) => { trigger.targets = extractTargets(trigger.raw); trigger.enablement = getEnablementState(trigger.raw); });
   automation.conditions.forEach(attachConditionTargets);
   attachSequenceTargets(automation.actions);
 
   if (!triggers.length) warnings.push("No trigger was found. This may be a script-like sequence or manually invoked automation.");
   if (triggers.some((trigger) => isDisabled(trigger.raw))) warnings.push("One or more triggers are disabled and are excluded from execution paths.");
+  if (triggers.some((trigger) => isDynamicEnabled(trigger.raw))) warnings.push("One or more triggers use templated enabled state; Home Assistant decides at runtime whether they are active.");
   if (automation.conditions.some((condition) => isDisabled(condition.raw))) warnings.push("One or more top-level conditions are disabled and are skipped during path analysis.");
+  if (automation.conditions.some((condition) => isDynamicEnabled(condition.raw))) warnings.push("One or more top-level conditions use templated enabled state and may be skipped at runtime.");
   return { automation, warnings };
 }
 

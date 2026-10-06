@@ -1,5 +1,24 @@
 export type UnknownRecord = Record<string, unknown>;
 
+export type EnablementState = "enabled" | "disabled" | "dynamic";
+
+const ENABLED_TRUE_VALUES = new Set(["1", "true", "yes", "on", "enable"]);
+const ENABLED_FALSE_VALUES = new Set(["0", "false", "no", "off", "disable"]);
+
+/** Mirror Home Assistant's boolean-or-template `enabled` semantics conservatively. */
+export function getEnablementState(raw: UnknownRecord): EnablementState {
+  const value = raw.enabled;
+  if (value == null) return "enabled";
+  if (typeof value === "boolean") return value ? "enabled" : "disabled";
+  if (typeof value === "number") return value === 0 ? "disabled" : "enabled";
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (ENABLED_TRUE_VALUES.has(normalized)) return "enabled";
+    if (ENABLED_FALSE_VALUES.has(normalized)) return "disabled";
+  }
+  return "dynamic";
+}
+
 export type TargetReferenceKind = "entity" | "device" | "area" | "floor" | "label";
 
 export interface TargetReference {
@@ -13,6 +32,7 @@ export interface BaseNode {
   summary: string;
   raw: UnknownRecord;
   targets?: TargetReference[];
+  enablement?: EnablementState;
 }
 
 export interface TriggerNode extends BaseNode {
@@ -194,6 +214,7 @@ export interface GraphNode {
   label: string;
   subtitle?: string;
   disabled?: boolean;
+  dynamicEnabled?: boolean;
 }
 
 export interface GraphEdge {

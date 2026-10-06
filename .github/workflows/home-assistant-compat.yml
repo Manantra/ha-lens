@@ -5,10 +5,22 @@ on:
     branches: [main]
     paths:
       - "custom_components/ha_lens/**"
+      - "packages/model/**"
+      - "packages/parser/**"
+      - "packages/analyzer/**"
+      - "packages/paths/**"
+      - "packages/graph/**"
+      - "tests/ha-2026-compat.test.ts"
       - ".github/workflows/home-assistant-compat.yml"
   pull_request:
     paths:
       - "custom_components/ha_lens/**"
+      - "packages/model/**"
+      - "packages/parser/**"
+      - "packages/analyzer/**"
+      - "packages/paths/**"
+      - "packages/graph/**"
+      - "tests/ha-2026-compat.test.ts"
       - ".github/workflows/home-assistant-compat.yml"
   schedule:
     - cron: "23 4 * * 1"
@@ -70,5 +82,13 @@ jobs:
               for token in tokens:
                   assert token in contract_source, f"Home Assistant contract missing: {token} ({module_name})"
 
-          print("HA Lens imports and required official Home Assistant WebSocket contracts are available.")
+          cv_source = inspect.getsource(importlib.import_module("homeassistant.helpers.config_validation"))
+          for schema_name in ("TRIGGER_BASE_SCHEMA", "CONDITION_BASE_SCHEMA", "SCRIPT_ACTION_BASE_SCHEMA"):
+              schema_index = cv_source.find(schema_name)
+              assert schema_index >= 0, f"Home Assistant config schema missing: {schema_name}"
+              schema_block = cv_source[schema_index:schema_index + 1800]
+              assert "CONF_ENABLED" in schema_block, f"enabled field missing from {schema_name}"
+              assert "Any(boolean, template)" in schema_block, f"enabled no longer accepts boolean-or-template in {schema_name}"
+
+          print("HA Lens imports, WebSocket contracts, and enabled boolean/template semantics are available.")
           PY

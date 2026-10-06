@@ -15,7 +15,7 @@ Current prerelease: **v0.1.35-beta.2**, focused on Home Assistant 2026 compatibi
 - [x] nested `sequence`, event actions and conversation responses
 - [x] Home Assistant logical-condition shorthands
 - [x] nested Home Assistant trigger-list flattening
-- [x] disabled trigger / condition / action semantics
+- [x] disabled and templated runtime-enabled trigger / condition / action semantics
 - [x] purpose-specific entity / device / area / floor / label targets
 - [x] bounded execution-path explorer with terminal-effect path names
 - [x] entity / target / action inventory
@@ -65,6 +65,7 @@ Current prerelease: **v0.1.35-beta.2**, focused on Home Assistant 2026 compatibi
 - [x] Home Assistant compatibility contract workflow
 - [x] pinned Home Assistant 2026.9.4 Stable contract check
 - [x] pinned Home Assistant 2026.10 beta contract check
+- [x] Stable/Beta contract guard for Home Assistant boolean-or-template `enabled` semantics
 
 ## Next
 

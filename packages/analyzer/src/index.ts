@@ -1,3 +1,4 @@
+import { getEnablementState } from "@ha-lens/model";
 import type { AnalysisResult, AutomationModel, ConditionNode, Insight, SequenceItem, TargetReference, TargetReferenceKind, TriggerNode, UnknownRecord } from "@ha-lens/model";
 
 const entityHelperPattern = /\b(?:states|is_state|is_state_attr|state_attr|has_value|expand)\(\s*["']([a-z0-9_]+\.[a-z0-9_]+)["']/gi;
@@ -43,7 +44,7 @@ function countCondition(condition: ConditionNode): { count: number; decisions: n
   const nested = children.map(countCondition);
   return {
     count: 1 + nested.reduce((sum, value) => sum + value.count, 0),
-    decisions: (condition.raw.enabled === false ? 0 : 1) + nested.reduce((sum, value) => sum + value.decisions, 0),
+    decisions: (getEnablementState(condition.raw) === "disabled" ? 0 : 1) + nested.reduce((sum, value) => sum + value.decisions, 0),
     depth: 1 + Math.max(0, ...nested.map((value) => value.depth)),
   };
 }
@@ -76,9 +77,17 @@ function inspectSequence(items: SequenceItem[], depth = 1): {
     if (item.kind === "stop" && item.raw.error === true) {
       insights.push({ level: "warning", nodeId: item.id, message: "This stop action terminates the sequence as an error." });
     }
-    if (item.raw.enabled === false) {
+    const enablement = getEnablementState(item.raw);
+    if (enablement === "disabled") {
       insights.push({ level: "info", nodeId: item.id, message: "This step is disabled in Home Assistant and is excluded from execution-path semantics." });
       continue;
+    }
+    if (enablement === "dynamic") {
+      insights.push({
+        level: "info",
+        nodeId: item.id,
+        message: "This step uses a templated enabled value. Home Assistant decides at runtime whether it runs; HA Lens models both run and skip possibilities.",
+      });
     }
     if (item.kind === "service") calls.push(item.action);
     if (item.kind === "device-action") calls.push(`${item.domain}.${item.actionType} [device]`);
@@ -314,29 +323,38 @@ function summarizeSequence(items: SequenceItem[]): string {
 export function explainAutomation(automation: AutomationModel): string[] {
   const lines: string[] = [];
 
-  const enabledTriggers = automation.triggers.filter((trigger) => trigger.raw.enabled !== false);
+  const enabledTriggers = automation.triggers.filter((trigger) => getEnablementState(trigger.raw) !== "disabled");
   if (enabledTriggers.length) {
     lines.push(`Starts when ${enabledTriggers.map((trigger) => trigger.summary).join(" or ")}.`);
-    const disabledTriggerCount = automation.triggers.length - enabledTriggers.length;
+    const disabledTriggerCount = automation.triggers.filter((trigger) => getEnablementState(trigger.raw) === "disabled").length;
     if (disabledTriggerCount) lines.push(`${disabledTriggerCount} configured trigger${disabledTriggerCount === 1 ? " is" : "s are"} disabled in Home Assistant.`);
+    const dynamicTriggerCount = automation.triggers.filter((trigger) => getEnablementState(trigger.raw) === "dynamic").length;
+    if (dynamicTriggerCount) lines.push(`${dynamicTriggerCount} configured trigger${dynamicTriggerCount === 1 ? " uses" : "s use"} templated enabled state and can start the automation only when Home Assistant evaluates the template as true.`);
   } else if (automation.triggers.length) {
     lines.push("All configured triggers are disabled in Home Assistant, so this automation cannot start from them.");
   } else {
     lines.push("Has no explicit trigger in the pasted YAML, so the flow begins manually or from an unspecified source.");
   }
 
-  const enabledConditions = automation.conditions.filter((condition) => condition.raw.enabled !== false);
+  const enabledConditions = automation.conditions.filter((condition) => getEnablementState(condition.raw) !== "disabled");
   if (enabledConditions.length) {
     lines.push(`Before actions run, every enabled top-level condition must pass: ${enabledConditions.map((condition) => condition.summary).join("; ")}.`);
   }
-  if (automation.conditions.some((condition) => condition.raw.enabled === false)) {
+  if (automation.conditions.some((condition) => getEnablementState(condition.raw) === "disabled")) {
     lines.push("Disabled top-level conditions are skipped by Home Assistant and excluded from HA Lens execution paths.");
+  }
+  if (automation.conditions.some((condition) => getEnablementState(condition.raw) === "dynamic")) {
+    lines.push("One or more top-level conditions use templated enabled state; Home Assistant may skip them at runtime, and HA Lens includes both possibilities in static paths.");
   }
 
   for (const item of automation.actions) {
-    if (item.raw.enabled === false) {
+    const enablement = getEnablementState(item.raw);
+    if (enablement === "disabled") {
       lines.push(`${item.summary} is disabled in Home Assistant and is skipped during execution.`);
       continue;
+    }
+    if (enablement === "dynamic") {
+      lines.push(`${item.summary} uses templated enabled state; Home Assistant may skip this step at runtime.`);
     }
     if (item.kind === "service") {
       lines.push(`Then it calls ${item.summary}.`);
@@ -443,6 +461,25 @@ export function analyzeAutomation(automation: AutomationModel): AnalysisResult {
   recordSequenceUsage(automation.actions, entityUsage);
   const conditionCount = conditionStats.reduce((sum, value) => sum + value.count, 0);
   const conditionDepth = Math.max(0, ...conditionStats.map((value) => value.depth));
+  const compatibilityInsights: Insight[] = [];
+  automation.triggers.forEach((trigger) => {
+    if (getEnablementState(trigger.raw) === "dynamic") {
+      compatibilityInsights.push({
+        level: "info",
+        nodeId: trigger.id,
+        message: "This trigger uses a templated enabled value and is active only when Home Assistant evaluates it as true at runtime.",
+      });
+    }
+  });
+  automation.conditions.forEach((condition) => {
+    if (getEnablementState(condition.raw) === "dynamic") {
+      compatibilityInsights.push({
+        level: "info",
+        nodeId: condition.id,
+        message: "This top-level condition uses a templated enabled value and may be skipped by Home Assistant at runtime.",
+      });
+    }
+  });
 
   return {
     stats: {
@@ -466,6 +503,6 @@ export function analyzeAutomation(automation: AutomationModel): AnalysisResult {
     ),
     actions: [...new Set(sequenceInfo.calls)].sort(),
     targets: collectSemanticTargets(automation),
-    insights: sequenceInfo.insights,
+    insights: [...compatibilityInsights, ...sequenceInfo.insights],
   };
 }

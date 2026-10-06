@@ -6,7 +6,7 @@ HA Lens is a static, read-only analyzer. “Supported” means a construct is pr
 | --- | --- |
 | `trigger` / `triggers` | Parsed and visualized; nested Trigger Lists are flattened into Home Assistant leaf/runtime order |
 | purpose-specific triggers | Generic readable type + entity/device/area/floor/label target context, without hard-coding every integration |
-| `enabled: false` | Remains visible as disabled but is excluded from execution-path semantics |
+| `enabled` boolean / template | Disabled elements remain visible but are excluded from execution paths; templated enabled state is marked runtime-dependent and static paths include both run/skip possibilities |
 | `condition` / `conditions` | Parsed as stop/continue decisions with common summaries |
 | logical condition shorthands | `condition: [...]`, `and`, `or`, and `not` are normalized, including inline action conditions |
 | purpose-specific conditions | Generic readable type + target context |
@@ -58,7 +58,7 @@ HA Lens is a static, read-only analyzer. “Supported” means a construct is pr
 - Parser nesting and execution-path expansion are bounded.
 - Dependency installation is lockfile-based; CI audits dependencies and produces a CycloneDX SBOM.
 - GitHub Actions are pinned by immutable SHAs and write permission is restricted to publish/release jobs.
-- Automated contract checks cover current Home Assistant Stable and Beta lines.
+- Automated contract checks cover current Home Assistant Stable and Beta lines, including Home Assistant boolean-or-template `enabled` schema semantics.
 
 ## Deliberate limitations
 

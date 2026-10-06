@@ -1,3 +1,4 @@
+import { getEnablementState } from "@ha-lens/model";
 import type { AutomationModel, ExecutionPath, PathStep, SequenceItem } from "@ha-lens/model";
 
 interface PathState {
@@ -21,12 +22,22 @@ function expandSequence(items: SequenceItem[], input: PathState[], maxPaths: num
   let states = input;
 
   for (const item of items) {
-    if (item.raw.enabled === false) continue;
+    const enablement = getEnablementState(item.raw);
+    if (enablement === "disabled") continue;
+    const dynamicEnabled = enablement === "dynamic";
     const next: PathState[] = [];
     for (const state of states) {
       if (state.terminal) {
         next.push(state);
         continue;
+      }
+
+      if (dynamicEnabled) {
+        next.push(cloneWith(state, {
+          nodeId: item.id,
+          label: `${item.summary} → skipped`,
+          detail: "enabled template evaluated false at runtime",
+        }));
       }
 
       if (item.kind === "service") {
@@ -114,17 +125,34 @@ function pathTitle(state: PathState, index: number): string {
 }
 
 export function enumerateExecutionPaths(automation: AutomationModel, maxPaths = 64): ExecutionPath[] {
-  const enabledTriggers = automation.triggers.filter((trigger) => trigger.raw.enabled !== false);
+  const enabledTriggers = automation.triggers.filter((trigger) => getEnablementState(trigger.raw) !== "disabled");
   const triggerStates: PathState[] = automation.triggers.length
-    ? enabledTriggers.map((trigger) => ({ steps: [{ nodeId: trigger.id, label: trigger.summary }], terminal: false }))
+    ? enabledTriggers.map((trigger) => ({
+        steps: [{
+          nodeId: trigger.id,
+          label: trigger.summary,
+          detail: getEnablementState(trigger.raw) === "dynamic"
+            ? "enabled template must evaluate true at runtime"
+            : undefined,
+        }],
+        terminal: false,
+      }))
     : [{ steps: [{ nodeId: "manual", label: "Manual / unspecified trigger" }], terminal: false }];
 
   let active = triggerStates;
   const terminal: PathState[] = [];
   for (const condition of automation.conditions) {
-    if (condition.raw.enabled === false) continue;
+    const enablement = getEnablementState(condition.raw);
+    if (enablement === "disabled") continue;
     const nextActive: PathState[] = [];
     for (const state of active) {
+      if (enablement === "dynamic") {
+        nextActive.push(cloneWith(state, {
+          nodeId: condition.id,
+          label: `${condition.summary} → skipped`,
+          detail: "enabled template evaluated false at runtime",
+        }));
+      }
       nextActive.push(cloneWith(state, { nodeId: condition.id, label: `${condition.summary} → true` }));
       const failed = cloneWith(state, { nodeId: condition.id, label: `${condition.summary} → false`, detail: "Top-level condition stops the automation" });
       terminal.push({ ...failed, terminal: true, outcome: "stopped" });

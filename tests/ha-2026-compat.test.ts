@@ -154,6 +154,61 @@ actions:
     expect(explainAutomation(automation).some((line) => line.includes("disabled in Home Assistant"))).toBe(true);
   });
 
+  it("models templated enabled values as runtime-dependent rather than always active", () => {
+    const { automation, warnings } = parseAutomationYaml(`
+alias: Dynamic enabled
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+    enabled: "{{ is_state('input_boolean.use_motion', 'on') }}"
+conditions:
+  - condition: state
+    entity_id: input_boolean.allow
+    state: "on"
+    enabled: "{{ now().hour >= 18 }}"
+actions:
+  - action: light.turn_on
+    target:
+      entity_id: light.hall
+    enabled: "{{ is_state('input_boolean.lights', 'on') }}"
+  - delay: "00:00:01"
+    enabled: "false"
+  - action: notify.mobile_app_phone
+    enabled: "on"
+  - action: notify.mobile_app_tablet
+    enabled: 2
+  - action: notify.mobile_app_watch
+    enabled: "enabled"
+`);
+
+    expect(automation.triggers[0].enablement).toBe("dynamic");
+    expect(automation.conditions[0].enablement).toBe("dynamic");
+    expect(automation.actions[0].enablement).toBe("dynamic");
+    expect(automation.actions[1].enablement).toBe("disabled");
+    expect(automation.actions[2].enablement).toBe("enabled");
+    expect(automation.actions[3].enablement).toBe("enabled");
+    expect(automation.actions[4].enablement).toBe("dynamic");
+    expect(warnings.some((warning) => warning.includes("templated enabled state"))).toBe(true);
+
+    const graph = buildAutomationGraph(automation);
+    expect(graph.nodes.find((node) => node.id === "triggers.0")?.dynamicEnabled).toBe(true);
+    expect(graph.nodes.find((node) => node.id === "conditions.0")?.dynamicEnabled).toBe(true);
+    expect(graph.nodes.find((node) => node.id === "actions.0")?.dynamicEnabled).toBe(true);
+    expect(graph.nodes.find((node) => node.id === "actions.1")?.disabled).toBe(true);
+
+    const paths = enumerateExecutionPaths(automation);
+    expect(paths.some((path) => path.steps.some((step) => step.nodeId === "conditions.0" && step.label.includes("skipped")))).toBe(true);
+    expect(paths.some((path) => path.steps.some((step) => step.nodeId === "actions.0" && step.label.includes("skipped")))).toBe(true);
+    expect(paths.every((path) => !path.steps.some((step) => step.nodeId === "actions.1"))).toBe(true);
+    expect(paths.some((path) => path.steps.some((step) => step.nodeId === "actions.2"))).toBe(true);
+
+    const analysis = analyzeAutomation(automation);
+    expect(analysis.insights.some((insight) => insight.nodeId === "triggers.0" && insight.message.includes("templated enabled"))).toBe(true);
+    expect(analysis.insights.some((insight) => insight.nodeId === "conditions.0" && insight.message.includes("templated enabled"))).toBe(true);
+    expect(analysis.insights.some((insight) => insight.nodeId === "actions.0" && insight.message.includes("templated enabled"))).toBe(true);
+    expect(explainAutomation(automation).some((line) => line.includes("templated enabled state"))).toBe(true);
+  });
+
   it("normalizes logical condition shorthand", () => {
     const { automation } = parseAutomationYaml(`
 alias: Condition shorthand
