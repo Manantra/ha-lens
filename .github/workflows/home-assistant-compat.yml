@@ -27,10 +27,10 @@ jobs:
         include:
           - home_assistant: "2026.9.4"
             install_source: "homeassistant==2026.9.4"
-          # 2026.10.0b1 was tagged before the PyPI prerelease mirror was available.
-          # Pin the exact upstream commit so the beta contract test is reproducible.
-          - home_assistant: "2026.10.0b1"
-            install_source: "https://github.com/home-assistant/core/archive/6d7c5068ee40366d577dfcfd5de48565185ee0d6.tar.gz"
+          # Pin the exact latest upstream beta tag commit so the compatibility
+          # contract stays reproducible even if prerelease mirrors lag behind.
+          - home_assistant: "2026.10.0b2"
+            install_source: "https://github.com/home-assistant/core/archive/a2ebb12561f4569e27c608bc3530eb4b98819b77.tar.gz"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
