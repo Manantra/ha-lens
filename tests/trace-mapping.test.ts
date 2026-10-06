@@ -3,6 +3,7 @@ import { buildAutomationGraph } from "@ha-lens/graph";
 import { parseAutomationYaml } from "@ha-lens/parser";
 import {
   buildTraceSemanticLabels,
+  buildTraceBreadcrumb,
   canonicalTraceSegments,
   buildTraceCoverage,
   traceBranchEdgeIds,
@@ -351,4 +352,79 @@ actions:
       .map((edge) => edge.label);
     expect(untakenBranchLabels).not.toContain("branch 2");
   });
+
+  it("builds readable breadcrumbs for deeply nested mixed control flow", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Runtime breadcrumb
+triggers: []
+actions:
+  - alias: Outer loop
+    repeat:
+      count: 2
+      sequence:
+        - alias: Fan out
+          parallel:
+            - sequence:
+                - delay: "00:00:01"
+            - sequence:
+                - alias: Pick scene
+                  choose:
+                    - alias: Night
+                      conditions:
+                        - condition: state
+                          entity_id: input_boolean.night
+                          state: "on"
+                      sequence:
+                        - action: scene.turn_on
+                          target:
+                            entity_id: scene.night
+`);
+
+    expect(buildTraceBreadcrumb(
+      automation,
+      "action/0/repeat/sequence/0/parallel/1/sequence/0/choose/0/sequence/0",
+      2,
+    )).toEqual([
+      "Repeat · Outer loop · iteration 2",
+      "Parallel · Fan out · Branch 2",
+      "Choose · Pick scene · Night",
+    ]);
+  });
+
+  it("labels nested if branches without inventing untaken context", () => {
+    const { automation } = parseAutomationYaml(`
+alias: If breadcrumb
+triggers: []
+actions:
+  - alias: Presence gate
+    if:
+      - condition: state
+        entity_id: binary_sensor.motion
+        state: "on"
+    then:
+      - alias: Retry
+        repeat:
+          count: 2
+          sequence:
+            - delay: "00:00:01"
+    else:
+      - stop: no motion
+`);
+
+    expect(buildTraceBreadcrumb(
+      automation,
+      "action/0/then/0/repeat/sequence/0",
+      1,
+    )).toEqual([
+      "If · Presence gate",
+      "Then",
+      "Repeat · Retry · iteration 1",
+    ]);
+
+    expect(buildTraceBreadcrumb(automation, "action/0/else/0")).toEqual([
+      "If · Presence gate",
+      "Else",
+    ]);
+  });
+
 });

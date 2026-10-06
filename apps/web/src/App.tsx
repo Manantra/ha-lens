@@ -9,6 +9,7 @@ import { exportAutomationGraph, type GraphExportFormat } from "./exportGraph";
 import { AutomationGraph, type GraphEntityIcon, type TraceNodeBadge } from "./AutomationGraph";
 import {
   buildTraceSemanticLabels,
+  buildTraceBreadcrumb,
   buildTraceCoverage,
   tracePathToNodeId,
   tracePathToSemanticId,
@@ -883,6 +884,7 @@ export function App() {
                     const semanticId = tracePathToSemanticId(step.path, traceSemanticLabels.keys());
                     const semanticLabel = semanticId ? traceSemanticLabels.get(semanticId) : undefined;
                     const resultText = formatTraceResult(step.result);
+                    const traceContext = buildTraceBreadcrumb(result.automation, step.path, step.repeatIndex);
                     const stepDetail = [
                       step.error || resultText,
                       step.repeatIndex ? `iteration ${step.repeatIndex}` : null,
@@ -903,6 +905,16 @@ export function App() {
                         <span className="trace-step__number">{index + 1}</span>
                         <span className="trace-step__body">
                           <strong>{semanticLabel || node?.label || step.path}</strong>
+                          {traceContext.length > 0 && (
+                            <span className="trace-step__context" title={traceContext.join(" → ")}>
+                              {traceContext.map((part, contextIndex) => (
+                                <span key={`${part}-${contextIndex}`}>
+                                  {contextIndex > 0 && <i aria-hidden="true">→</i>}
+                                  <b>{part}</b>
+                                </span>
+                              ))}
+                            </span>
+                          )}
                           <code>{step.path}</code>
                           {stepDetail && (
                             <small className={step.error ? "trace-step__error" : ""}>

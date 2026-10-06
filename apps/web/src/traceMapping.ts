@@ -147,6 +147,153 @@ function addSequenceLabels(items: SequenceItem[], labels: Map<string, string>) {
   }
 }
 
+
+function buildSequenceItemIndex(automation: AutomationModel): Map<string, SequenceItem> {
+  const index = new Map<string, SequenceItem>();
+
+  const visit = (items: SequenceItem[]) => {
+    for (const item of items) {
+      index.set(item.id, item);
+      if (item.kind === "if") {
+        visit(item.then);
+        visit(item.else);
+      } else if (item.kind === "choose") {
+        item.choices.forEach((choice) => visit(choice.sequence));
+        visit(item.default);
+      } else if (item.kind === "repeat") {
+        visit(item.sequence);
+      } else if (item.kind === "parallel") {
+        item.branches.forEach(visit);
+      } else if (item.kind === "sequence") {
+        visit(item.sequence);
+      }
+    }
+  };
+
+  visit(automation.actions);
+  return index;
+}
+
+function pushContext(output: string[], value: string | null | undefined) {
+  if (!value || output[output.length - 1] === value) return;
+  output.push(value);
+}
+
+function controlContext(item: SequenceItem | undefined, fallback: string): string {
+  if (!item?.alias) return fallback;
+  return `${fallback} · ${item.alias}`;
+}
+
+/**
+ * Turn Home Assistant's runtime path into a human-readable structural breadcrumb.
+ * Only structure explicitly present in the trace path is described; this never
+ * infers untaken branches or runtime decisions that Home Assistant did not report.
+ */
+export function buildTraceBreadcrumb(
+  automation: AutomationModel,
+  path: string,
+  repeatIndex?: number | null,
+): string[] {
+  const parts = path.split("/").filter(Boolean);
+  if (parts[0] !== "action" || !/^\d+$/.test(parts[1] ?? "")) return [];
+
+  const items = buildSequenceItemIndex(automation);
+  const output: string[] = [];
+  let currentId = `actions.${parts[1]}`;
+  let cursor = 2;
+
+  while (cursor < parts.length) {
+    const token = parts[cursor];
+    const current = items.get(currentId);
+
+    if ((token === "then" || token === "else") && /^\d+$/.test(parts[cursor + 1] ?? "")) {
+      if (current?.kind === "if") pushContext(output, controlContext(current, "If"));
+      pushContext(output, token === "then" ? "Then" : "Else");
+      currentId = `${currentId}.${token}.${parts[cursor + 1]}`;
+      cursor += 2;
+      continue;
+    }
+
+    if (token === "if") {
+      if (current?.kind === "if") pushContext(output, controlContext(current, "If"));
+      if (parts[cursor + 1] === "condition" && /^\d+$/.test(parts[cursor + 2] ?? "")) {
+        currentId = `${currentId}.if.${parts[cursor + 2]}`;
+        cursor += 3;
+      } else {
+        cursor += 1;
+      }
+      continue;
+    }
+
+    if (token === "choose" && /^\d+$/.test(parts[cursor + 1] ?? "")) {
+      const choiceIndex = Number(parts[cursor + 1]);
+      if (current?.kind === "choose") {
+        const choice = current.choices[choiceIndex];
+        const choiceLabel = choice?.alias || `Option ${choiceIndex + 1}`;
+        const prefix = current.alias ? `Choose · ${current.alias}` : "Choose";
+        pushContext(output, `${prefix} · ${choiceLabel}`);
+      } else {
+        pushContext(output, `Choose · Option ${choiceIndex + 1}`);
+      }
+
+      if (parts[cursor + 2] === "sequence" && /^\d+$/.test(parts[cursor + 3] ?? "")) {
+        currentId = `${currentId}.choose.${choiceIndex}.sequence.${parts[cursor + 3]}`;
+        cursor += 4;
+      } else {
+        cursor += 2;
+      }
+      continue;
+    }
+
+    if (token === "default" && /^\d+$/.test(parts[cursor + 1] ?? "")) {
+      if (current?.kind === "choose") {
+        pushContext(output, current.alias ? `Choose · ${current.alias} · Default` : "Choose · Default");
+      } else {
+        pushContext(output, "Choose · Default");
+      }
+      currentId = `${currentId}.default.${parts[cursor + 1]}`;
+      cursor += 2;
+      continue;
+    }
+
+    if (token === "repeat") {
+      const base = controlContext(current, "Repeat");
+      pushContext(output, repeatIndex && repeatIndex > 0 ? `${base} · iteration ${repeatIndex}` : base);
+      if (parts[cursor + 1] === "sequence" && /^\d+$/.test(parts[cursor + 2] ?? "")) {
+        currentId = `${currentId}.repeat.sequence.${parts[cursor + 2]}`;
+        cursor += 3;
+      } else {
+        cursor += 1;
+      }
+      continue;
+    }
+
+    if (token === "parallel" && /^\d+$/.test(parts[cursor + 1] ?? "")) {
+      const branchIndex = Number(parts[cursor + 1]);
+      const base = controlContext(current, "Parallel");
+      pushContext(output, `${base} · Branch ${branchIndex + 1}`);
+      if (parts[cursor + 2] === "sequence" && /^\d+$/.test(parts[cursor + 3] ?? "")) {
+        currentId = `${currentId}.parallel.${branchIndex}.${parts[cursor + 3]}`;
+        cursor += 4;
+      } else {
+        cursor += 2;
+      }
+      continue;
+    }
+
+    if (token === "sequence" && /^\d+$/.test(parts[cursor + 1] ?? "")) {
+      if (current?.kind === "sequence") pushContext(output, controlContext(current, "Sequence"));
+      currentId = `${currentId}.sequence.${parts[cursor + 1]}`;
+      cursor += 2;
+      continue;
+    }
+
+    cursor += 1;
+  }
+
+  return output;
+}
+
 export function buildTraceSemanticLabels(automation: AutomationModel): Map<string, string> {
   const labels = new Map<string, string>();
   automation.triggers.forEach((trigger) => labels.set(trigger.id, trigger.alias || trigger.summary));

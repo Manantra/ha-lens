@@ -401,6 +401,10 @@ button.ghost { background: transparent; color: #dce3f5; }
 .trace-step__number { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; background: #1c3025; color: #8ed3aa; font-size: 9px; font-weight: 800; }
 .trace-step__body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .trace-step__body strong { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trace-step__context { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; margin: 1px 0; color: #94a6bf; font-size: 8px; line-height: 1.35; }
+.trace-step__context > span { display: inline-flex; align-items: center; gap: 3px; min-width: 0; }
+.trace-step__context i { color: #526079; font-style: normal; }
+.trace-step__context b { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid #314158; border-radius: 999px; padding: 1px 5px; background: #141d29; color: #a9b8cf; font-size: 8px; font-weight: 750; }
 .trace-step__body code { color: #6f8879; font-size: 9px; overflow-wrap: anywhere; }
 .trace-step__body small { color: #9db0a4; font-size: 9px; overflow-wrap: anywhere; }
 .trace-step__body .trace-step__error { color: #ff9eaa; }
