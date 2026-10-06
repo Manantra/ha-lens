@@ -292,10 +292,11 @@ class HaLensPanel extends HTMLElement {
 
   async _automationConfig(entityId) {
     if (!this._hass?.callWS) throw new Error("Home Assistant WebSocket API is unavailable.");
-    const config = await this._hass.callWS({
+    const response = await this._hass.callWS({
       type: "automation/config",
       entity_id: entityId,
     });
+    const config = response?.config;
     if (!config || typeof config !== "object" || Array.isArray(config)) {
       throw new Error(`Home Assistant did not return a readable config for ${entityId}.`);
     }
