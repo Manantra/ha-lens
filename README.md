@@ -4,7 +4,7 @@
 
 HA Lens is a read-only visualizer and analyzer for Home Assistant automations. It turns automation YAML into a semantic flow graph, execution paths, entity/action inventory, structural insights, deterministic explanations, and—inside Home Assistant—a view of the latest runtime trace.
 
-> Current stable companion release: **v0.1.35**. Current prerelease: **v0.1.36-beta.1**, adding readable nested runtime breadcrumbs. v0.1.35 focuses on Home Assistant 2026 compatibility and security hardening. HA Lens remains intentionally read-only: it analyzes automations but does not execute or modify them.
+> Current stable companion release: **v0.1.35**. Current prerelease: **v0.1.36-beta.2**, adding readable nested runtime breadcrumbs, local read-only snapshots, and opt-in conservative lint checks. v0.1.35 focuses on Home Assistant 2026 compatibility and security hardening. HA Lens remains intentionally read-only: it analyzes automations but does not execute or modify them.
 
 ## Why HA Lens?
 
@@ -26,6 +26,8 @@ Visual flow editors are great for *building* automations. HA Lens is deliberatel
 - Copy Mermaid flowchart code for GitHub READMEs, wikis, and documentation.
 - Use Presentation Mode for tutorials, screenshots, videos, and documentation.
 - Keep unknown/new Home Assistant syntax visible instead of crashing.
+- Save/open local read-only snapshots containing only automation YAML plus minimal snapshot metadata; no trace or registry data is included.
+- Run optional conservative lint checks on demand; lint findings are advisory and never replace Home Assistant validation.
 
 ## Quick start
 
@@ -87,9 +89,9 @@ The Home Assistant companion does **not** require GitHub Pages: HACS installs a 
 
 The Home Assistant 2026 compatibility and security-hardening pass is complete in v0.1.35. The next development focus is:
 
-- additional runtime-label polish for unusually deep mixed control flow
-- read-only snapshots
-- optional lint rules
+- validate the v0.1.36 prerelease live inside Home Assistant
+- refine snapshot ergonomics only if real-world use shows a need
+- expand lint rules only when their semantics can stay conservative and well documented
 
 See [`ROADMAP.md`](ROADMAP.md) for the detailed checklist.
 

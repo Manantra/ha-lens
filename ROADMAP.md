@@ -4,7 +4,7 @@
 
 v0.1.35 completes the Home Assistant 2026 compatibility and security-hardening pass.
 
-Current prerelease: **v0.1.36-beta.1**, adding readable nested runtime breadcrumbs.
+Current prerelease: **v0.1.36-beta.2**, adding readable nested runtime breadcrumbs, local read-only snapshots, and opt-in conservative lint checks.
 
 ### Visual inspection
 
@@ -72,6 +72,11 @@ Current prerelease: **v0.1.36-beta.1**, adding readable nested runtime breadcrum
 
 ## Next
 
-- [ ] additional runtime-label polish for unusually deep mixed control flow
-- [ ] shareable read-only snapshots
-- [ ] optional lint rules with clearly documented semantics
+- [x] readable runtime breadcrumbs for unusually deep mixed control flow
+- [x] local read-only snapshots with a versioned schema and strict size/schema validation
+- [x] optional conservative lint rules with documented advisory semantics
+
+## Next after v0.1.36 validation
+
+- [ ] refine snapshot/lint UX only from real-world feedback
+- [ ] continue monitoring Home Assistant Stable/Beta automation contracts
