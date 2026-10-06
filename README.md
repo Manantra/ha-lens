@@ -4,7 +4,7 @@
 
 HA Lens is a read-only visualizer and analyzer for Home Assistant automations. It turns automation YAML into a semantic flow graph, execution paths, entity/action inventory, structural insights, deterministic explanations, and—inside Home Assistant—a view of the latest runtime trace.
 
-> Current stable companion release: **v0.1.34**. Current prerelease: **v0.1.35-beta.3**, focused on Home Assistant 2026 compatibility and security hardening. HA Lens remains intentionally read-only: it analyzes automations but does not execute or modify them.
+> Current stable companion release: **v0.1.35**. This release focuses on Home Assistant 2026 compatibility and security hardening. HA Lens remains intentionally read-only: it analyzes automations but does not execute or modify them.
 
 ## Why HA Lens?
 
@@ -85,7 +85,7 @@ The Home Assistant companion does **not** require GitHub Pages: HACS installs a 
 
 ## Roadmap
 
-The immediate focus is completing the v0.1.35 live compatibility pass against Home Assistant 2026.9 Stable and 2026.10 beta. After that:
+The Home Assistant 2026 compatibility and security-hardening pass is complete in v0.1.35. The next development focus is:
 
 - additional runtime-label polish for unusually deep mixed control flow
 - read-only snapshots

@@ -1,8 +1,8 @@
 # HA Lens roadmap
 
-## Current stable — v0.1.34
+## Current stable — v0.1.35
 
-Current prerelease: **v0.1.35-beta.3**, focused on Home Assistant 2026 compatibility and security hardening rather than a new headline feature.
+v0.1.35 completes the Home Assistant 2026 compatibility and security-hardening pass.
 
 ### Visual inspection
 
@@ -66,10 +66,10 @@ Current prerelease: **v0.1.35-beta.3**, focused on Home Assistant 2026 compatibi
 - [x] pinned Home Assistant 2026.9.4 Stable contract check
 - [x] pinned Home Assistant 2026.10 beta contract check
 - [x] Stable/Beta contract guard for Home Assistant boolean-or-template `enabled` semantics
+- [x] installed companion asset parity check against a real Home Assistant instance
 
 ## Next
 
-- [ ] live-test v0.1.35 beta on a real Home Assistant instance
 - [ ] additional runtime-label polish for unusually deep mixed control flow
 - [ ] shareable read-only snapshots
 - [ ] optional lint rules with clearly documented semantics
