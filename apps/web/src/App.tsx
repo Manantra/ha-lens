@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { analyzeAutomation, explainAutomation } from "@ha-lens/analyzer";
 import { buildAutomationGraph } from "@ha-lens/graph";
 import { automationGraphToMermaid } from "@ha-lens/exporter";
@@ -16,6 +16,7 @@ import {
 } from "./traceMapping";
 import { sampleAutomation } from "./sample";
 import { buildAutomationDiff } from "./automationDiff";
+import { createAutomationSnapshot, parseAutomationSnapshot, serializeAutomationSnapshot, snapshotFilename } from "./snapshot";
 import {
   sanitizeAutomationReferences,
   sanitizeCompanionTrace,
@@ -134,6 +135,8 @@ export function App() {
   const [graphFitMode, setGraphFitMode] = useState<GraphFitMode>("all");
   const [exporting, setExporting] = useState<GraphExportFormat | null>(null);
   const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
+  const [snapshotStatus, setSnapshotStatus] = useState<"idle" | "saved" | "loaded" | "error">("idle");
+  const snapshotInputRef = useRef<HTMLInputElement>(null);
   const [entityMetadata, setEntityMetadata] = useState<Record<string, CompanionEntityMetadata>>({});
   const [targetMetadata, setTargetMetadata] = useState<CompanionTargetMetadata>({});
   const [automationReferences, setAutomationReferences] = useState<Record<string, string[]>>({});
@@ -433,6 +436,61 @@ export function App() {
     }
   }
 
+  function resetCompanionContext() {
+    setEntityMetadata({});
+    setTargetMetadata({});
+    setAutomationReferences({});
+    setTrace(null);
+    setTriggerDiagnostic(null);
+    setHomeAssistantUnavailable(false);
+    setShowTrace(false);
+    setSelectedTraceNodeId(null);
+    setSelectedDiffNodeId(null);
+    setSelectedPath(null);
+    setSelectedEntity(null);
+  }
+
+  function exportSnapshot() {
+    if (!result.ok) return;
+    try {
+      const snapshot = createAutomationSnapshot(yaml, result.automation.alias);
+      const blob = new Blob([serializeAutomationSnapshot(snapshot)], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = snapshotFilename(result.automation.alias);
+      document.body.append(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setSnapshotStatus("saved");
+      window.setTimeout(() => setSnapshotStatus("idle"), 1800);
+    } catch (error) {
+      console.error("HA Lens snapshot export failed", error);
+      setSnapshotStatus("error");
+      window.setTimeout(() => setSnapshotStatus("idle"), 2600);
+    }
+  }
+
+  async function importSnapshot(file: File | undefined) {
+    if (!file) return;
+    try {
+      const snapshot = parseAutomationSnapshot(await file.text());
+      setYaml(snapshot.automation.yaml);
+      setBaselineYaml(snapshot.automation.yaml);
+      resetCompanionContext();
+      setTab("summary");
+      setSnapshotStatus("loaded");
+      window.setTimeout(() => setSnapshotStatus("idle"), 1800);
+    } catch (error) {
+      console.error("HA Lens snapshot import failed", error);
+      setSnapshotStatus("error");
+      window.setTimeout(() => setSnapshotStatus("idle"), 3200);
+    } finally {
+      if (snapshotInputRef.current) snapshotInputRef.current.value = "";
+    }
+  }
+
   if (presentation && result.ok) {
     return (
       <main className="presentation">
@@ -471,7 +529,16 @@ export function App() {
           <div className="panel__header">
             <strong>Automation YAML</strong>
             <div className="yaml-panel__tools">
-              <span>local only</span>
+              <span>{snapshotStatus === "saved" ? "snapshot saved ✓" : snapshotStatus === "loaded" ? "snapshot loaded ✓" : snapshotStatus === "error" ? "snapshot failed" : "local only"}</span>
+              <input
+                ref={snapshotInputRef}
+                className="snapshot-input"
+                type="file"
+                accept=".json,.ha-lens.json,application/json"
+                onChange={(event) => void importSnapshot(event.target.files?.[0])}
+              />
+              <button className="ghost snapshot-tool" disabled={!result.ok} onClick={exportSnapshot} title="Save only this automation YAML as a local HA Lens snapshot">Save snapshot</button>
+              <button className="ghost snapshot-tool" onClick={() => snapshotInputRef.current?.click()} title="Open a local HA Lens snapshot; no data is uploaded">Open snapshot</button>
               <button
                 className="ghost yaml-toggle"
                 onClick={() => setYamlCollapsed(true)}
