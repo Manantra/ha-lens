@@ -3,10 +3,13 @@
 import json
 from pathlib import Path
 
+from aiohttp import web
+
 from homeassistant.components import frontend, panel_custom
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.http import HomeAssistantView
 
 from .const import (
     DOMAIN,
@@ -15,8 +18,29 @@ from .const import (
     PANEL_TITLE,
     PANEL_URL,
     STATIC_URL,
+    VIEWER_STATIC_URL,
     VIEWER_URL,
 )
+
+
+class HaLensViewerView(HomeAssistantView):
+    """Serve the sandboxed HA Lens viewer with wildcard CORS for its opaque origin."""
+
+    url = f"{VIEWER_STATIC_URL}/{{path:.*}}"
+    name = "ha_lens:viewer"
+    requires_auth = False
+    cors_allowed = True
+
+    def __init__(self, viewer_path: Path) -> None:
+        """Initialize the viewer file root."""
+        self._viewer_path = viewer_path.resolve()
+
+    async def get(self, request: web.Request, path: str) -> web.FileResponse:
+        """Serve a bundled viewer file without allowing path traversal."""
+        requested = (self._viewer_path / (path or "index.html")).resolve()
+        if not requested.is_relative_to(self._viewer_path) or not requested.is_file():
+            raise web.HTTPNotFound
+        return web.FileResponse(requested)
 
 
 def _integration_version() -> str:
@@ -35,12 +59,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     data = hass.data.setdefault(DOMAIN, {})
     version = _integration_version()
 
+    frontend_path = Path(__file__).parent / "frontend"
     if not data.get("static_registered"):
-        frontend_path = Path(__file__).parent / "frontend"
         await hass.http.async_register_static_paths(
             [StaticPathConfig(STATIC_URL, str(frontend_path), False)]
         )
         data["static_registered"] = True
+
+    if not data.get("viewer_registered"):
+        hass.http.register_view(HaLensViewerView(frontend_path / "app"))
+        data["viewer_registered"] = True
 
     if frontend.async_panel_exists(hass, PANEL_URL):
         frontend.async_remove_panel(hass, PANEL_URL, warn_if_unknown=False)

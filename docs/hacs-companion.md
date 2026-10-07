@@ -36,7 +36,7 @@ Home Assistant admin panel
 
 The compiled visualizer is shipped inside `custom_components/ha_lens/frontend/app`. It therefore works without GitHub Pages and does not need an external HA Lens backend.
 
-The viewer iframe is sandboxed without `allow-same-origin`. Because a sandboxed iframe has an opaque origin, parent/child messages use the concrete window source plus a per-instance random nonce instead of trusting a wildcard message by itself. Incoming trace/reference metadata is schema-filtered and bounded before use.
+The viewer iframe is sandboxed without `allow-same-origin`. Because a sandboxed iframe has an opaque origin, its bundled HTML/JS/CSS is served from the dedicated read-only `/ha_lens_viewer/` endpoint with CORS enabled; this endpoint exposes only static viewer files, never Home Assistant data or credentials. Parent/child messages use the concrete window source plus a per-instance random nonce instead of trusting a wildcard message by itself. Incoming trace/reference metadata is schema-filtered and bounded before use.
 
 ## Home Assistant compatibility
 

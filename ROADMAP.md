@@ -4,7 +4,7 @@
 
 v0.1.35 completes the Home Assistant 2026 compatibility and security-hardening pass.
 
-Current prerelease: **v0.1.36-beta.3**, adding readable nested runtime breadcrumbs, local read-only snapshots, and opt-in conservative lint checks.
+Current prerelease: **v0.1.36-beta.4**, adding readable nested runtime breadcrumbs, local read-only snapshots, and opt-in conservative lint checks.
 
 ### Visual inspection
 
@@ -46,6 +46,7 @@ Current prerelease: **v0.1.36-beta.3**, adding readable nested runtime breadcrum
 - [x] unavailable Home Assistant automations remain inspectable but clearly marked
 - [x] native Home Assistant entity icon resolution and SVG rendering
 - [x] sandboxed local viewer with nonce-authenticated messaging
+- [x] opaque-origin viewer assets served through a dedicated CORS-enabled endpoint without weakening the iframe sandbox
 - [x] bounded/sanitized companion payload and trace results
 - [x] latest Home Assistant execution trace overlay
 - [x] separate `not_triggered` trigger diagnostics from real executions

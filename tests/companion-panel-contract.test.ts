@@ -31,4 +31,10 @@ describe("Home Assistant companion WebSocket contracts", () => {
     expect(panelSource).toContain("Loaded HA Lens integration version");
   });
 
+  it("keeps the viewer sandbox isolated while loading from the CORS-enabled viewer endpoint", () => {
+    expect(panelSource).toContain('const DEFAULT_VIEWER_URL = "/ha_lens_viewer/index.html"');
+    expect(panelSource).toContain('sandbox="allow-scripts allow-downloads"');
+    expect(panelSource).not.toContain("allow-same-origin");
+  });
+
 });

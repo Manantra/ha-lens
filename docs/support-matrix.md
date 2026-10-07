@@ -57,6 +57,7 @@ HA Lens is a static, read-only analyzer. “Supported” means a construct is pr
 ## Security and compatibility guardrails
 
 - Companion viewer is sandboxed and uses nonce-authenticated parent/child messaging.
+- Sandboxed opaque-origin viewer assets are served from a dedicated CORS-enabled static route; Home Assistant data still crosses only the bounded nonce-authenticated message channel.
 - Incoming trace/reference payloads are schema-filtered and bounded.
 - Parser nesting and execution-path expansion are bounded.
 - Dependency installation is lockfile-based; CI audits dependencies and produces a CycloneDX SBOM.

@@ -40,7 +40,7 @@ jobs:
       - name: Build local Home Assistant viewer
         run: npm run bundle:companion
         env:
-          VITE_BASE_PATH: /ha_lens_static/app/
+          VITE_BASE_PATH: /ha_lens_viewer/
       - name: Upload bundled frontend
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:

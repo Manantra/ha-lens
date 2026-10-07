@@ -7,6 +7,7 @@ HA Lens is designed as a read-only automation analyzer. The standalone app must 
 - The Home Assistant panel is admin-only.
 - Only the selected automation configuration is fetched through Home Assistant's official read API.
 - The bundled viewer runs in a sandboxed iframe and does not receive a Home Assistant access token.
+- The opaque-origin viewer loads only bundled files from a dedicated CORS-enabled static endpoint; that route contains no Home Assistant state, trace data, registry data, or credentials.
 - Parent/child messages use a random per-panel nonce and source validation.
 - Trace/reference payloads are compacted, allow-listed, and bounded before the viewer uses them.
 - Parser nesting and execution-path expansion have explicit safety limits.

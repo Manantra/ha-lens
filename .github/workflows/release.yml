@@ -31,7 +31,7 @@ jobs:
       - name: Validate bundled companion frontend
         run: |
           test -f custom_components/ha_lens/frontend/app/index.html
-          grep -q "/ha_lens_static/app/assets/" custom_components/ha_lens/frontend/app/index.html
+          grep -q "/ha_lens_viewer/assets/" custom_components/ha_lens/frontend/app/index.html
 
       - name: Publish GitHub release
         env:

@@ -11,9 +11,9 @@ if (!existsSync(join(source, "index.html"))) {
 }
 
 const index = readFileSync(join(source, "index.html"), "utf8");
-if (!index.includes("/ha_lens_static/app/")) {
+if (!index.includes("/ha_lens_viewer/")) {
   throw new Error(
-    "Companion bundle has the wrong Vite base path. Set VITE_BASE_PATH=/ha_lens_static/app/ before building.",
+    "Companion bundle has the wrong Vite base path. Set VITE_BASE_PATH=/ha_lens_viewer/ before building.",
   );
 }
 

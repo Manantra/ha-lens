@@ -60,6 +60,12 @@ jobs:
           module = importlib.import_module("custom_components.ha_lens")
           assert callable(module.async_setup_entry)
           assert callable(module.async_unload_entry)
+          assert module.HaLensViewerView.cors_allowed is True
+          assert module.HaLensViewerView.requires_auth is False
+          assert module.HaLensViewerView.url == "/ha_lens_viewer/{path:.*}"
+
+          view_source = inspect.getsource(importlib.import_module("homeassistant.helpers.http").HomeAssistantView.register)
+          assert "KEY_ALLOW_ALL_CORS" in view_source, "cors_allowed no longer maps to wildcard CORS"
 
           source = pathlib.Path("custom_components/ha_lens/__init__.py").read_text()
           forbidden = (

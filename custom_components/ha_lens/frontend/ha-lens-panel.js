@@ -1,4 +1,4 @@
-const DEFAULT_VIEWER_URL = "/ha_lens_static/app/index.html";
+const DEFAULT_VIEWER_URL = "/ha_lens_viewer/index.html";
 
 class HaLensPanel extends HTMLElement {
   constructor() {
