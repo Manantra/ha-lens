@@ -1,10 +1,8 @@
 # HA Lens roadmap
 
-## Current stable — v0.1.35
+## Current stable — v0.1.36
 
-v0.1.35 completes the Home Assistant 2026 compatibility and security-hardening pass.
-
-Current prerelease: **v0.1.36-beta.4**, adding readable nested runtime breadcrumbs, local read-only snapshots, and opt-in conservative lint checks.
+v0.1.36 carries the Home Assistant 2026 compatibility and security-hardening work into stable and adds readable nested runtime breadcrumbs, local read-only snapshots, opt-in conservative lint checks, and the dedicated CORS-enabled static viewer route required by the opaque-origin sandbox.
 
 ### Visual inspection
 
