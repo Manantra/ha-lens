@@ -41,8 +41,8 @@ jobs:
             install_source: "homeassistant==2026.9.4"
           # Pin the exact latest upstream beta tag commit so the compatibility
           # contract stays reproducible even if prerelease mirrors lag behind.
-          - home_assistant: "2026.10.0b2"
-            install_source: "https://github.com/home-assistant/core/archive/a2ebb12561f4569e27c608bc3530eb4b98819b77.tar.gz"
+          - home_assistant: "2026.10.0b4"
+            install_source: "https://github.com/home-assistant/core/archive/e692d385440cdda4f5b95e7fc67d905f93125467.tar.gz"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
