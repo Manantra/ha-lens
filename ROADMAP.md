@@ -4,7 +4,7 @@
 
 v0.1.35 completes the Home Assistant 2026 compatibility and security-hardening pass.
 
-Current prerelease: **v0.1.36-beta.2**, adding readable nested runtime breadcrumbs, local read-only snapshots, and opt-in conservative lint checks.
+Current prerelease: **v0.1.36-beta.3**, adding readable nested runtime breadcrumbs, local read-only snapshots, and opt-in conservative lint checks.
 
 ### Visual inspection
 
