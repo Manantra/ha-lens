@@ -104,6 +104,14 @@ class HaLensPanel extends HTMLElement {
           color: #7c9cff;
         }
 
+        .brand .version {
+          margin-left: 6px;
+          color: #8d98af;
+          font-size: 10px;
+          font-weight: 750;
+          letter-spacing: .02em;
+        }
+
         .automation-search,
         select {
           flex: 1;
@@ -165,7 +173,7 @@ class HaLensPanel extends HTMLElement {
       </style>
       <div class="shell">
         <div class="toolbar">
-          <div class="brand"><span>◉</span> HA Lens</div>
+          <div class="brand"><span>◉</span> HA Lens <small class="version"></small></div>
           <input class="automation-search" type="search" placeholder="Filter automations…" aria-label="Filter automations" />
           <select aria-label="Home Assistant automation">
             <option value="">Select an automation…</option>
@@ -179,6 +187,7 @@ class HaLensPanel extends HTMLElement {
     this._search = this.shadowRoot.querySelector(".automation-search");
     this._select = this.shadowRoot.querySelector("select");
     this._status = this.shadowRoot.querySelector(".status");
+    this._version = this.shadowRoot.querySelector(".version");
     this._frame = this.shadowRoot.querySelector("iframe");
 
     this._search.addEventListener("input", () => {
@@ -198,6 +207,11 @@ class HaLensPanel extends HTMLElement {
 
   _applyPanelConfig() {
     if (!this._frame) return;
+    const version = this._panel?.config?.version;
+    if (this._version) {
+      this._version.textContent = version ? "v" + String(version) : "";
+      this._version.title = version ? "Loaded HA Lens integration version " + String(version) : "";
+    }
     const viewerUrl = new URL(this._viewerUrl(), window.location.origin);
     this._targetOrigin = viewerUrl.origin;
     const nextUrl = this._embeddedUrl();

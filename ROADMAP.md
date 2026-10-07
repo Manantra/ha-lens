@@ -69,6 +69,7 @@ Current prerelease: **v0.1.36-beta.2**, adding readable nested runtime breadcrum
 - [x] pinned Home Assistant 2026.10 beta contract check
 - [x] Stable/Beta contract guard for Home Assistant boolean-or-template `enabled` semantics
 - [x] installed companion asset parity check against a real Home Assistant instance
+- [x] loaded integration version visible in the companion toolbar for stale-install diagnosis
 
 ## Next
 

@@ -24,4 +24,11 @@ describe("Home Assistant companion WebSocket contracts", () => {
     expect(panelSource).toContain("summary?.not_triggered === true");
     expect(panelSource).toContain("triggerDiagnostic: traces.diagnostic");
   });
+
+  it("shows the version Home Assistant actually loaded", () => {
+    expect(panelSource).toContain('class="version"');
+    expect(panelSource).toContain("this._panel?.config?.version");
+    expect(panelSource).toContain("Loaded HA Lens integration version");
+  });
+
 });
