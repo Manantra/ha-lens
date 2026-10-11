@@ -1,5 +1,5 @@
 import { parse, stringify } from "yaml";
-import { getEnablementState } from "@ha-lens/model";
+import { getEnablementState, hasDynamicTarget } from "@ha-lens/model";
 import type {
   AutomationModel,
   ChooseBranch,
@@ -30,13 +30,25 @@ function assertSafeDepth(depth: number) {
   }
 }
 
-function flattenTriggerRecords(value: unknown, depth = 0): UnknownRecord[] {
+function flattenTriggerRecords(
+  value: unknown,
+  depth = 0,
+  diagnostics?: { ignoredEntries: number },
+): UnknownRecord[] {
   assertSafeDepth(depth);
   const output: UnknownRecord[] = [];
   for (const entry of asList(value)) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+      if (diagnostics) diagnostics.ignoredEntries += 1;
+      continue;
+    }
     const raw = asRecord(entry);
+    if (!Object.keys(raw).length) {
+      if (diagnostics) diagnostics.ignoredEntries += 1;
+      continue;
+    }
     if (raw.triggers != null && raw.trigger == null && raw.platform == null) {
-      output.push(...flattenTriggerRecords(raw.triggers, depth + 1));
+      output.push(...flattenTriggerRecords(raw.triggers, depth + 1, diagnostics));
       continue;
     }
     output.push(raw);
@@ -116,6 +128,7 @@ function triggerListTargets(value: unknown, depth = 0): TargetReference[] {
 
 function attachConditionTargets(condition: ConditionNode) {
   condition.targets = extractTargets(condition.raw);
+  condition.dynamicTarget = hasDynamicTarget(condition.raw);
   condition.enablement = getEnablementState(condition.raw);
   condition.children?.forEach(attachConditionTargets);
 }
@@ -124,6 +137,7 @@ function attachSequenceTargets(items: SequenceItem[]) {
   for (const item of items) item.enablement = getEnablementState(item.raw);
   for (const item of items) {
     item.targets = extractTargets(item.raw);
+    item.dynamicTarget = hasDynamicTarget(item.raw);
     if (item.kind === "if") {
       item.conditions.forEach(attachConditionTargets);
       attachSequenceTargets(item.then);
@@ -160,6 +174,35 @@ function targetSummary(raw: UnknownRecord): string {
   return targets
     .map((target) => `${target.kind}: ${target.ids.join(", ")}`)
     .join(" · ");
+}
+
+
+const GENERIC_DETAIL_OMIT = new Set([
+  "trigger", "platform", "condition", "alias", "id", "enabled", "note",
+  "target", "entity_id", "device_id", "area_id", "floor_id", "label_id",
+]);
+
+function friendlyPlatformType(type: string): string {
+  return type
+    .split(".")
+    .map((part) => part.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()))
+    .join(" · ");
+}
+
+function genericDetailSummary(raw: UnknownRecord, limit = 3): string {
+  const parts: string[] = [];
+  for (const [key, value] of Object.entries(raw)) {
+    if (GENERIC_DETAIL_OMIT.has(key) || value == null) continue;
+    if (typeof value === "object" && !Array.isArray(value)) {
+      const compact = compactValue(value);
+      if (compact && compact.length <= 80) parts.push(`${key.replaceAll("_", " ")}: ${compact}`);
+    } else if (["string", "number", "boolean"].includes(typeof value) || Array.isArray(value)) {
+      const compact = compactValue(value);
+      if (compact && compact.length <= 80) parts.push(`${key.replaceAll("_", " ")}: ${compact}`);
+    }
+    if (parts.length >= limit) break;
+  }
+  return parts.join(" · ");
 }
 
 const stringValue = (value: unknown, fallback: string) =>
@@ -244,8 +287,10 @@ function summarizeTrigger(raw: UnknownRecord): string {
     return `Device${domain || eventType ? `: ${[domain, eventType].filter(Boolean).join(" · ")}` : " trigger"}`;
   }
   const target = targetSummary(raw);
-  const friendlyType = type.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-  return target ? `${friendlyType} → ${target}` : `${friendlyType} trigger`;
+  const detail = genericDetailSummary(raw);
+  const friendlyType = friendlyPlatformType(type);
+  const suffix = [target ? `→ ${target}` : "", detail].filter(Boolean).join(" · ");
+  return suffix ? `${friendlyType} · ${suffix}` : `${friendlyType} trigger`;
 }
 
 function summarizeCondition(raw: UnknownRecord): string {
@@ -281,8 +326,10 @@ function summarizeCondition(raw: UnknownRecord): string {
   }
   if (["and", "or", "not"].includes(type)) return `${type.toUpperCase()} condition`;
   const target = targetSummary(raw);
-  const friendlyType = type.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
-  return target ? `${friendlyType} → ${target}` : `${friendlyType} condition`;
+  const detail = genericDetailSummary(raw);
+  const friendlyType = friendlyPlatformType(type);
+  const suffix = [target ? `→ ${target}` : "", detail].filter(Boolean).join(" · ");
+  return suffix ? `${friendlyType} · ${suffix}` : `${friendlyType} condition`;
 }
 
 function parseCondition(value: unknown, id: string, depth = 0): ConditionNode {
@@ -324,20 +371,21 @@ function triggerReferenceIds(value: unknown): string[] {
     .map((item) => item.trim());
 }
 
-function resolveTriggerConditionSummary(condition: ConditionNode, triggersById: Map<string, TriggerNode>) {
+function resolveTriggerConditionSummary(condition: ConditionNode, triggersById: Map<string, TriggerNode[]>) {
   if (condition.conditionType === "trigger") {
     const ids = triggerReferenceIds(condition.raw.id);
     if (ids.length) {
-      condition.summary = `Triggered by: ${ids.map((id) => {
-        const trigger = triggersById.get(id);
-        return trigger ? (trigger.alias || trigger.summary) : id;
-      }).join(" / ")}`;
+      const labels = ids.flatMap((id) => {
+        const triggers = triggersById.get(id) ?? [];
+        return triggers.length ? triggers.map((trigger) => trigger.alias || trigger.summary) : [id];
+      });
+      condition.summary = `Triggered by: ${[...new Set(labels)].join(" / ")}`;
     }
   }
   condition.children?.forEach((child) => resolveTriggerConditionSummary(child, triggersById));
 }
 
-function resolveSequenceTriggerConditions(items: SequenceItem[], triggersById: Map<string, TriggerNode>) {
+function resolveSequenceTriggerConditions(items: SequenceItem[], triggersById: Map<string, TriggerNode[]>) {
   for (const item of items) {
     if (item.kind === "if") {
       item.conditions.forEach((condition) => resolveTriggerConditionSummary(condition, triggersById));
@@ -453,7 +501,11 @@ function parseSequenceItem(value: unknown, id: string, depth = 0): SequenceItem 
       id,
       kind: "repeat",
       alias,
-      summary: alias || `Repeat: ${repeatType}`,
+      summary: alias || (
+        repeatType === "count" ? `Repeat: count · ${compactValue(repeat.count)}`
+          : repeatType === "for_each" ? `Repeat: for each · ${compactValue(repeat.for_each)}`
+            : `Repeat: ${repeatType}`
+      ),
       raw,
       repeatType,
       sequence: parseSequence(repeat.sequence, `${id}.repeat.sequence`, depth + 1),
@@ -489,7 +541,7 @@ function parseSequenceItem(value: unknown, id: string, depth = 0): SequenceItem 
       kind: "wait",
       waitType: "template",
       alias,
-      summary: alias || "Wait for template",
+      summary: alias || `Wait for template${raw.timeout != null ? ` · timeout ${compactValue(raw.timeout)}` : ""}${raw.continue_on_timeout === false ? " · stop on timeout" : ""}`,
       raw,
       timeout: raw.timeout,
       continueOnTimeout: raw.continue_on_timeout !== false,
@@ -502,14 +554,14 @@ function parseSequenceItem(value: unknown, id: string, depth = 0): SequenceItem 
       kind: "wait",
       waitType: "trigger",
       alias,
-      summary: alias || "Wait for trigger",
+      summary: alias || `Wait for trigger${raw.timeout != null ? ` · timeout ${compactValue(raw.timeout)}` : ""}${raw.continue_on_timeout === false ? " · stop on timeout" : ""}`,
       raw,
       timeout: raw.timeout,
       continueOnTimeout: raw.continue_on_timeout !== false,
     };
   }
 
-  if (raw.delay != null) return { id, kind: "delay", alias, summary: alias || `Delay ${String(raw.delay)}`, raw };
+  if (raw.delay != null) return { id, kind: "delay", alias, summary: alias || `Delay ${compactValue(raw.delay)}`, raw };
   if (raw.variables != null) return { id, kind: "variables", alias, summary: alias || "Set variables", raw };
   if (raw.stop != null) return { id, kind: "stop", alias, summary: alias || `Stop: ${String(raw.stop)}`, raw };
 
@@ -575,7 +627,8 @@ export function parseAutomationYaml(source: string): ParseResult {
   const conditionValues = raw.conditions ?? raw.condition;
   const actionValues = raw.actions ?? raw.action;
 
-  const flattenedTriggerRecords = flattenTriggerRecords(triggerValues);
+  const triggerDiagnostics = { ignoredEntries: 0 };
+  const flattenedTriggerRecords = flattenTriggerRecords(triggerValues, 0, triggerDiagnostics);
   const triggers: TriggerNode[] = flattenedTriggerRecords.map((triggerRaw, index) => {
     const triggerType = stringValue(triggerRaw.trigger ?? triggerRaw.platform, "unknown");
     return {
@@ -598,20 +651,24 @@ export function parseAutomationYaml(source: string): ParseResult {
     actions: parseSequence(actionValues, "actions"),
     raw,
   };
-  const triggersById = new Map(
-    automation.triggers.flatMap((trigger) =>
-      typeof trigger.raw.id === "string" && trigger.raw.id.trim()
-        ? [[trigger.raw.id.trim(), trigger] as const]
-        : []
-    ),
-  );
+  const triggersById = new Map<string, TriggerNode[]>();
+  for (const trigger of automation.triggers) {
+    if (typeof trigger.raw.id !== "string" || !trigger.raw.id.trim()) continue;
+    const id = trigger.raw.id.trim();
+    triggersById.set(id, [...(triggersById.get(id) ?? []), trigger]);
+  }
   automation.conditions.forEach((condition) => resolveTriggerConditionSummary(condition, triggersById));
   resolveSequenceTriggerConditions(automation.actions, triggersById);
 
-  automation.triggers.forEach((trigger) => { trigger.targets = extractTargets(trigger.raw); trigger.enablement = getEnablementState(trigger.raw); });
+  automation.triggers.forEach((trigger) => {
+    trigger.targets = extractTargets(trigger.raw);
+    trigger.dynamicTarget = hasDynamicTarget(trigger.raw);
+    trigger.enablement = getEnablementState(trigger.raw);
+  });
   automation.conditions.forEach(attachConditionTargets);
   attachSequenceTargets(automation.actions);
 
+  if (triggerDiagnostics.ignoredEntries) warnings.push(`Ignored ${triggerDiagnostics.ignoredEntries} empty or invalid trigger entr${triggerDiagnostics.ignoredEntries === 1 ? "y" : "ies"} while flattening Home Assistant trigger lists.`);
   if (!triggers.length) warnings.push("No trigger was found. This may be a script-like sequence or manually invoked automation.");
   if (triggers.some((trigger) => isDisabled(trigger.raw))) warnings.push("One or more triggers are disabled and are excluded from execution paths.");
   if (triggers.some((trigger) => isDynamicEnabled(trigger.raw))) warnings.push("One or more triggers use templated enabled state; Home Assistant decides at runtime whether they are active.");

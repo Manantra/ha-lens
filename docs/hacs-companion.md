@@ -17,6 +17,8 @@ The HA Lens companion is intentionally read-only and admin-only.
 - Captures a local Diff baseline and compares local YAML edits without registering any write command.
 - Saves and opens local HA Lens snapshots containing only automation YAML plus minimal snapshot metadata; traces and registry metadata are not exported.
 - Offers opt-in local lint checks whose findings are advisory and separate from Home Assistant validation.
+- Shows the connected Home Assistant version and explains when Last run data is unavailable because a 2026.10.1 automation has no configuration ID.
+- Keeps templated targets marked as runtime-resolved and understands 2026.10 Triggered by generated/shared/dangling ID semantics.
 - Does not register a Home Assistant action/service that can modify or execute an automation.
 
 ## Architecture
@@ -28,7 +30,7 @@ Home Assistant admin panel
   ├─ search/related → HA-resolved references
   ├─ entity/device/area/floor/label registries → friendly metadata
   ├─ trace/list + trace/get → execution + trigger diagnostic
-  └─ compact + bounded postMessage payload + random nonce
+  └─ compact + bounded MessageChannel payload + random nonce
             ↓
   sandboxed bundled HA Lens viewer
   /ha_lens_static/app/index.html
@@ -36,16 +38,17 @@ Home Assistant admin panel
 
 The compiled visualizer is shipped inside `custom_components/ha_lens/frontend/app`. It therefore works without GitHub Pages and does not need an external HA Lens backend.
 
-The viewer iframe is sandboxed without `allow-same-origin`. Because a sandboxed iframe has an opaque origin, its bundled HTML/JS/CSS is served from the dedicated read-only `/ha_lens_viewer/` endpoint with CORS enabled; this endpoint exposes only static viewer files, never Home Assistant data or credentials. Parent/child messages use the concrete window source plus a per-instance random nonce instead of trusting a wildcard message by itself. Incoming trace/reference metadata is schema-filtered and bounded before use.
+The viewer iframe is sandboxed without `allow-same-origin`. Because a sandboxed iframe has an opaque origin, its bundled HTML/JS/CSS is served from the dedicated read-only `/ha_lens_viewer/` endpoint with CORS enabled; this endpoint exposes only static viewer files, never Home Assistant data or credentials. Parent/child data uses a per-instance nonce-authenticated MessageChannel when supported; the window-message path remains only as a nonce-checked compatibility/bootstrap fallback. Incoming trace/reference metadata is schema-filtered and bounded before use.
 
 ## Home Assistant compatibility
 
 The repository contains an automated contract workflow for the official Home Assistant interfaces HA Lens depends on. The current hardening line checks:
 
-- Home Assistant **2026.9.4 Stable**
-- Home Assistant **2026.10 beta**, pinned to the exact upstream beta commit when the corresponding PyPI prerelease is not yet mirrored
+- Home Assistant **2026.9.4** as a previous-stable regression guard
+- Home Assistant **2026.10.1 Stable**
+- Home Assistant **2026.10.0b7**, the final 2026.10 beta tag, pinned to its exact upstream commit
 
-The checked contracts include `automation/config`, `search/related`, `trace/list`, `trace/get`, and floor/label registry list commands. HA Lens no longer imports Home Assistant's private automation component storage or exposes its own automation-config dump WebSocket command.
+The checked contracts include `automation/config`, `search/related`, `trace/list`, `trace/get`, dynamic `trigger_platforms/subscribe` and `condition_platforms/subscribe`, floor/label registry commands, boolean-or-template `enabled`, the 2026.10.1 trace-without-ID rule, and the stricter 2026.10 state-condition duration validation. HA Lens no longer imports Home Assistant's private automation component storage or exposes its own automation-config dump WebSocket command.
 
 ## HACS custom-repository install
 

@@ -144,6 +144,8 @@ export function App() {
   const [trace, setTrace] = useState<CompanionTrace | null>(null);
   const [triggerDiagnostic, setTriggerDiagnostic] = useState<CompanionTrace | null>(null);
   const [homeAssistantUnavailable, setHomeAssistantUnavailable] = useState(false);
+  const [homeAssistantVersion, setHomeAssistantVersion] = useState<string | null>(null);
+  const [traceUnavailableReason, setTraceUnavailableReason] = useState<string | null>(null);
   const [showTrace, setShowTrace] = useState(false);
   const [selectedTraceNodeId, setSelectedTraceNodeId] = useState<string | null>(null);
   const [selectedDiffNodeId, setSelectedDiffNodeId] = useState<string | null>(null);
@@ -161,12 +163,11 @@ export function App() {
       parentOrigin = null;
     }
 
-    const receiveAutomation = (event: MessageEvent<unknown>) => {
-      if (event.source !== window.parent) return;
-      if (parentOrigin && event.origin !== parentOrigin) return;
-      if (!event.data || typeof event.data !== "object") return;
+    let channelPort: MessagePort | null = null;
 
-      const message = event.data as {
+    const applyAutomationMessage = (data: unknown) => {
+      if (!data || typeof data !== "object") return;
+      const message = data as {
         type?: string;
         nonce?: string;
         config?: unknown;
@@ -175,7 +176,9 @@ export function App() {
         automationReferences?: Record<string, string[]>;
         trace?: CompanionTrace | null;
         triggerDiagnostic?: CompanionTrace | null;
+        traceUnavailableReason?: string | null;
         homeAssistantUnavailable?: boolean;
+        homeAssistantVersion?: string | null;
       };
       if (message.type !== "ha-lens:automation" || message.nonce !== channelNonce || !message.config || typeof message.config !== "object" || Array.isArray(message.config)) return;
 
@@ -193,7 +196,13 @@ export function App() {
       const sanitizedTrace = sanitizeCompanionTrace(message.trace);
       setTrace(sanitizedTrace);
       setTriggerDiagnostic(sanitizeCompanionTrace(message.triggerDiagnostic));
+      setTraceUnavailableReason(
+        ["automation_without_id", "trace_api_error", "websocket_unavailable"].includes(String(message.traceUnavailableReason))
+          ? String(message.traceUnavailableReason)
+          : null,
+      );
       setHomeAssistantUnavailable(Boolean(message.homeAssistantUnavailable));
+      setHomeAssistantVersion(typeof message.homeAssistantVersion === "string" ? message.homeAssistantVersion.slice(0, 80) : null);
       setShowTrace(Boolean(sanitizedTrace));
       setSelectedPath(null);
       setSelectedEntity(null);
@@ -203,10 +212,31 @@ export function App() {
       setTab("summary");
     };
 
-    window.addEventListener("message", receiveAutomation);
-    if (channelNonce) window.parent.postMessage({ type: "ha-lens:ready", version: 2, nonce: channelNonce }, parentOrigin ?? "*");
+    const receiveAutomation = (event: MessageEvent<unknown>) => {
+      if (event.source !== window.parent) return;
+      if (parentOrigin && event.origin !== parentOrigin) return;
+      if (!event.data || typeof event.data !== "object") return;
+      const bootstrap = event.data as { type?: string; nonce?: string };
+      if (bootstrap.type === "ha-lens:channel" && bootstrap.nonce === channelNonce && event.ports?.[0]) {
+        channelPort?.close();
+        channelPort = event.ports[0];
+        channelPort.onmessage = (portEvent) => applyAutomationMessage(portEvent.data);
+        channelPort.start();
+        channelPort.postMessage({ type: "ha-lens:ready", version: 3, nonce: channelNonce });
+        return;
+      }
+      applyAutomationMessage(event.data);
+    };
 
-    return () => window.removeEventListener("message", receiveAutomation);
+    window.addEventListener("message", receiveAutomation);
+    if (channelNonce) {
+      window.parent.postMessage({ type: "ha-lens:channel-request", version: 3, nonce: channelNonce }, parentOrigin ?? "*");
+    }
+
+    return () => {
+      window.removeEventListener("message", receiveAutomation);
+      channelPort?.close();
+    };
   }, [channelNonce]);
 
   const result = useMemo(() => {
@@ -693,8 +723,19 @@ export function App() {
               <>
                 <h2>{result.automation.alias}</h2>
                 {result.automation.description && <p className="muted">{result.automation.description}</p>}
+                {homeAssistantVersion && (
+                  <div className="ha-version-note">Home Assistant {homeAssistantVersion}</div>
+                )}
                 {homeAssistantUnavailable && (
                   <div className="notice notice--warning">Home Assistant currently marks this automation as unavailable. HA Lens can still inspect the raw configuration, but the automation is not runnable in Home Assistant until its validation issue is resolved.</div>
+                )}
+                {traceUnavailableReason === "automation_without_id" && !trace && !triggerDiagnostic && (
+                  <div className="notice">
+                    Home Assistant does not store automation traces when this automation has no configuration ID. Since 2026.10.1 this is intentional Core behavior, so Last run coverage is unavailable until an ID is present.
+                  </div>
+                )}
+                {traceUnavailableReason === "trace_api_error" && !trace && !triggerDiagnostic && (
+                  <div className="notice notice--warning">Home Assistant's trace API could not be read for this automation. Static analysis remains available.</div>
                 )}
                 {trace && (
                   <div className="trace-card">

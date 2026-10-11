@@ -46,6 +46,7 @@ interface DiffContext {
   changedCurrentIds: Set<string>;
   unchangedCurrentIds: Set<string>;
   changes: AutomationDiffChange[];
+  triggerRefTokens: Map<string, string>;
 }
 
 function isRecord(value: unknown): value is UnknownRecord {
@@ -79,6 +80,39 @@ function normalizedTriggerRaw(raw: UnknownRecord): UnknownRecord {
   const normalized = { ...raw };
   delete normalized.id;
   return normalized;
+}
+
+
+function triggerReferenceTokens(triggers: TriggerNode[]): Map<string, string> {
+  const grouped = new Map<string, string[]>();
+  for (const trigger of triggers) {
+    const id = typeof trigger.raw.id === "string" ? trigger.raw.id.trim() : "";
+    if (!id.startsWith("generated-")) continue;
+    const token = canonical(normalizedTriggerRaw(trigger.raw));
+    grouped.set(id, [...(grouped.get(id) ?? []), token]);
+  }
+  return new Map(
+    [...grouped.entries()].map(([id, tokens]) => [id, tokens.sort().join("||")]),
+  );
+}
+
+function normalizeGeneratedTriggerReferences(value: unknown, refs: Map<string, string>): unknown {
+  if (Array.isArray(value)) return value.map((item) => normalizeGeneratedTriggerReferences(item, refs));
+  if (!isRecord(value)) return value;
+
+  const output: UnknownRecord = {};
+  for (const [key, child] of Object.entries(value)) {
+    if (key === "id" && value.condition === "trigger") {
+      const normalizeId = (id: unknown) =>
+        typeof id === "string" && id.startsWith("generated-")
+          ? `__ha_generated_trigger__:${refs.get(id) ?? `missing:${id}`}`
+          : id;
+      output[key] = Array.isArray(child) ? child.map(normalizeId) : normalizeId(child);
+      continue;
+    }
+    output[key] = normalizeGeneratedTriggerReferences(child, refs);
+  }
+  return output;
 }
 
 function conditionIdentity(node: ConditionNode): string {
@@ -128,16 +162,16 @@ function sequenceIdentity(node: SequenceItem): string {
   }
 }
 
-function nodeFingerprint(node: SemanticNode): string {
+function nodeFingerprint(node: SemanticNode, triggerRefs: Map<string, string>): string {
   if (node.kind === "trigger") return canonical(normalizedTriggerRaw(node.raw));
-  if (node.kind === "condition") return canonical(node.raw);
+  if (node.kind === "condition") return canonical(normalizeGeneratedTriggerReferences(node.raw, triggerRefs));
 
   switch (node.kind) {
     case "if":
       return canonical({
         kind: node.kind,
         alias: node.alias || null,
-        conditions: node.conditions.map((condition) => condition.raw),
+        conditions: node.conditions.map((condition) => normalizeGeneratedTriggerReferences(condition.raw, triggerRefs)),
       });
     case "choose":
       return canonical({
@@ -145,7 +179,7 @@ function nodeFingerprint(node: SemanticNode): string {
         alias: node.alias || null,
         choices: node.choices.map((choice) => ({
           alias: choice.alias || null,
-          conditions: choice.conditions.map((condition) => condition.raw),
+          conditions: choice.conditions.map((condition) => normalizeGeneratedTriggerReferences(condition.raw, triggerRefs)),
         })),
         hasDefault: node.default.length > 0,
       });
@@ -156,7 +190,7 @@ function nodeFingerprint(node: SemanticNode): string {
         kind: node.kind,
         alias: node.alias || null,
         repeatType: node.repeatType,
-        repeat: repeatRaw,
+        repeat: normalizeGeneratedTriggerReferences(repeatRaw, triggerRefs),
       });
     }
     case "parallel":
@@ -169,10 +203,10 @@ function nodeFingerprint(node: SemanticNode): string {
     case "sequence": {
       const raw = { ...node.raw };
       delete raw.sequence;
-      return canonical({ kind: node.kind, raw });
+      return canonical({ kind: node.kind, raw: normalizeGeneratedTriggerReferences(raw, triggerRefs) });
     }
     default:
-      return canonical(node.raw);
+      return canonical(normalizeGeneratedTriggerReferences(node.raw, triggerRefs));
   }
 }
 
@@ -312,10 +346,15 @@ function markRemovedSequence(items: SequenceItem[], ctx: DiffContext) {
   }
 }
 
-function choiceIdentity(choice: { alias?: string; conditions: ConditionNode[] }): string {
+function choiceIdentity(
+  choice: { alias?: string; conditions: ConditionNode[] },
+  triggerRefs: Map<string, string>,
+): string {
   return canonical({
     alias: choice.alias || null,
-    conditions: choice.conditions.map((condition) => condition.raw),
+    conditions: choice.conditions.map((condition) =>
+      normalizeGeneratedTriggerReferences(condition.raw, triggerRefs)
+    ),
   });
 }
 
@@ -326,7 +365,11 @@ function compareSequenceNode(before: SequenceItem, after: SequenceItem, ctx: Dif
     matchSequence(before.then, after.then, ctx);
     matchSequence(before.else, after.else, ctx);
   } else if (before.kind === "choose" && after.kind === "choose") {
-    const pairs = lcsPairs(before.choices, after.choices, choiceIdentity);
+    const pairs = lcsPairs(
+      before.choices,
+      after.choices,
+      (choice) => choiceIdentity(choice, ctx.triggerRefTokens),
+    );
     const matchedBefore = new Set(pairs.map(([index]) => index));
     const matchedAfter = new Set(pairs.map(([, index]) => index));
 
@@ -361,7 +404,7 @@ function compareSequenceNode(before: SequenceItem, after: SequenceItem, ctx: Dif
 function compareNode(before: SemanticNode, after: SemanticNode, ctx: DiffContext) {
   ctx.baselineToCurrent.set(before.id, after.id);
 
-  if (nodeFingerprint(before) === nodeFingerprint(after)) {
+  if (nodeFingerprint(before, ctx.triggerRefTokens) === nodeFingerprint(after, ctx.triggerRefTokens)) {
     ctx.unchangedCurrentIds.add(after.id);
     return;
   }
@@ -507,6 +550,11 @@ export function buildAutomationDiff(
   baselineGraph: AutomationGraph,
   currentGraph: AutomationGraph,
 ): AutomationDiffResult {
+  const triggerRefTokens = new Map([
+    ...triggerReferenceTokens(baseline.triggers),
+    ...triggerReferenceTokens(current.triggers),
+  ]);
+
   const ctx: DiffContext = {
     baselineToCurrent: new Map(),
     addedCurrentIds: new Set(),
@@ -514,6 +562,7 @@ export function buildAutomationDiff(
     changedCurrentIds: new Set(),
     unchangedCurrentIds: new Set(),
     changes: [],
+    triggerRefTokens,
   };
 
   matchTopLevel(baseline.triggers, current.triggers, triggerIdentity, ctx);

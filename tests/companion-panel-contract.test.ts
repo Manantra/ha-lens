@@ -37,4 +37,20 @@ describe("Home Assistant companion WebSocket contracts", () => {
     expect(panelSource).not.toContain("allow-same-origin");
   });
 
+
+  it("uses a nonce-authenticated MessageChannel for the sandboxed viewer with a bounded fallback", () => {
+    expect(panelSource).toContain("new MessageChannel()");
+    expect(panelSource).toContain('type: "ha-lens:channel"');
+    expect(panelSource).toContain('type === "ha-lens:channel-request"');
+    expect(panelSource).toContain("this._messagePort.postMessage(message)");
+    expect(panelSource).toContain("event.data?.nonce !== this._channelNonce");
+  });
+
+  it("surfaces Home Assistant 2026.10.1 trace-storage constraints and the loaded HA version", () => {
+    expect(panelSource).toContain('unavailableReason: "automation_without_id"');
+    expect(panelSource).toContain("traceUnavailableReason: traces.unavailableReason");
+    expect(panelSource).toContain("homeAssistantVersion:");
+    expect(panelSource).toContain("this._hass?.config?.version");
+  });
+
 });

@@ -1,4 +1,4 @@
-import { getEnablementState } from "@ha-lens/model";
+import { getEnablementState, hasDynamicTarget } from "@ha-lens/model";
 import type { AnalysisResult, AutomationModel, ConditionNode, Insight, SequenceItem, TargetReference, TargetReferenceKind, TriggerNode, UnknownRecord } from "@ha-lens/model";
 
 const entityHelperPattern = /\b(?:states|is_state|is_state_attr|state_attr|has_value|expand)\(\s*["']([a-z0-9_]+\.[a-z0-9_]+)["']/gi;
@@ -67,6 +67,9 @@ function inspectSequence(items: SequenceItem[], depth = 1): {
     maxDepth = Math.max(maxDepth, depth);
     if (typeof item.raw.note === "string" && item.raw.note.trim()) {
       insights.push({ level: "info", nodeId: item.id, message: `Editor note: ${item.raw.note.trim()}` });
+    }
+    if (hasDynamicTarget(item.raw)) {
+      insights.push({ level: "info", nodeId: item.id, message: "This action uses a templated target that Home Assistant resolves at runtime." });
     }
     if (item.raw.continue_on_error === true) {
       insights.push({ level: "info", nodeId: item.id, message: "Home Assistant will continue to the next step if this action raises an error." });
@@ -463,6 +466,13 @@ export function analyzeAutomation(automation: AutomationModel): AnalysisResult {
   const conditionDepth = Math.max(0, ...conditionStats.map((value) => value.depth));
   const compatibilityInsights: Insight[] = [];
   automation.triggers.forEach((trigger) => {
+    if (hasDynamicTarget(trigger.raw)) {
+      compatibilityInsights.push({
+        level: "info",
+        nodeId: trigger.id,
+        message: "This trigger uses a templated target that Home Assistant resolves at runtime.",
+      });
+    }
     if (getEnablementState(trigger.raw) === "dynamic") {
       compatibilityInsights.push({
         level: "info",
@@ -472,6 +482,13 @@ export function analyzeAutomation(automation: AutomationModel): AnalysisResult {
     }
   });
   automation.conditions.forEach((condition) => {
+    if (hasDynamicTarget(condition.raw)) {
+      compatibilityInsights.push({
+        level: "info",
+        nodeId: condition.id,
+        message: "This condition uses a templated target that Home Assistant resolves at runtime.",
+      });
+    }
     if (getEnablementState(condition.raw) === "dynamic") {
       compatibilityInsights.push({
         level: "info",

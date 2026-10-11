@@ -19,6 +19,14 @@ function enabledState(raw: Record<string, unknown>) {
   return getEnablementState(raw);
 }
 
+
+function triggerReferenceIds(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : [value];
+  return values
+    .filter((item): item is string => typeof item === "string" && Boolean(item.trim()))
+    .map((item) => item.trim());
+}
+
 function collectConditions(conditions: ConditionNode[], output: ConditionNode[]) {
   for (const condition of conditions) {
     output.push(condition);
@@ -156,6 +164,61 @@ export function lintAutomation(automation: AutomationModel): LintIssue[] {
   }
 
   findUnreachableAfterStop(automation.actions, issues);
+
+  const triggerIdCounts = new Map<string, number>();
+  for (const trigger of automation.triggers) {
+    const id = typeof trigger.raw.id === "string" ? trigger.raw.id.trim() : "";
+    if (id) triggerIdCounts.set(id, (triggerIdCounts.get(id) ?? 0) + 1);
+  }
+
+  const triggerConditions = conditions.filter((condition) => condition.conditionType === "trigger");
+  const referencedTriggerIds = new Set(triggerConditions.flatMap((condition) => triggerReferenceIds(condition.raw.id)));
+
+  for (const [id, count] of triggerIdCounts) {
+    if (count > 1 && referencedTriggerIds.has(id)) {
+      issues.push({
+        ruleId: "HAL009",
+        severity: "info",
+        title: "Shared trigger ID",
+        detail: `${count} triggers share “${id}”. Home Assistant 2026.10 still supports shared manual IDs, but its editor may offer to assign unique IDs when a Triggered by condition references them.`,
+      });
+    }
+  }
+
+  for (const condition of triggerConditions) {
+    const missing = triggerReferenceIds(condition.raw.id).filter((id) => !triggerIdCounts.has(id));
+    if (missing.length) {
+      issues.push({
+        ruleId: "HAL010",
+        severity: "warning",
+        title: "Triggered by references a missing trigger",
+        detail: `This condition references ${missing.map((id) => `“${id}”`).join(", ")}, but no current trigger uses that ID. Home Assistant 2026.10 flags the same dangling reference in the automation editor.`,
+        nodeId: condition.id,
+      });
+    }
+  }
+
+  const inputEntityStatePattern = /^input_(?:select|text|number|boolean|datetime)\.[\da-z_]+$/i;
+  for (const condition of conditions) {
+    if (condition.conditionType !== "state" || condition.raw.for == null) continue;
+    const state = condition.raw.state;
+    const invalidReason = condition.raw.attribute != null
+      ? "an attribute"
+      : Array.isArray(state) && state.length > 1
+        ? "a list of states"
+        : inputEntityStatePattern.test(String(Array.isArray(state) ? state[0] ?? "" : state ?? ""))
+          ? "a state resolved from another input entity"
+          : null;
+    if (!invalidReason) continue;
+
+    issues.push({
+      ruleId: "HAL011",
+      severity: "warning",
+      title: "Invalid state duration in Home Assistant 2026.10",
+      detail: `Home Assistant 2026.10 rejects a state condition that combines “for” with ${invalidReason}. Remove “for” or use a single literal state.`,
+      nodeId: condition.id,
+    });
+  }
 
   const unknownActions = actions.filter((item) => item.kind === "unknown");
   if (unknownActions.length > 0) {

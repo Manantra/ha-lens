@@ -19,6 +19,29 @@ export function getEnablementState(raw: UnknownRecord): EnablementState {
   return "dynamic";
 }
 
+
+
+const TARGET_ID_KEYS = ["entity_id", "device_id", "area_id", "floor_id", "label_id"] as const;
+
+function valueContainsTemplate(value: unknown): boolean {
+  if (typeof value === "string") return value.includes("{{") || value.includes("{%");
+  if (Array.isArray(value)) return value.some(valueContainsTemplate);
+  return false;
+}
+
+/** Detect Home Assistant service/purpose targets that cannot be resolved statically. */
+export function hasDynamicTarget(raw: UnknownRecord): boolean {
+  if (typeof raw.target === "string") return valueContainsTemplate(raw.target);
+
+  const target = raw.target && typeof raw.target === "object" && !Array.isArray(raw.target)
+    ? raw.target as UnknownRecord
+    : {};
+
+  return TARGET_ID_KEYS.some((key) =>
+    valueContainsTemplate(raw[key]) || valueContainsTemplate(target[key])
+  );
+}
+
 export type TargetReferenceKind = "entity" | "device" | "area" | "floor" | "label";
 
 export interface TargetReference {
@@ -32,6 +55,8 @@ export interface BaseNode {
   summary: string;
   raw: UnknownRecord;
   targets?: TargetReference[];
+  /** True when Home Assistant resolves at least one target from a template at runtime. */
+  dynamicTarget?: boolean;
   enablement?: EnablementState;
 }
 

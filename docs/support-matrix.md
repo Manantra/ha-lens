@@ -5,11 +5,11 @@ HA Lens is a static, read-only analyzer. “Supported” means a construct is pr
 | Home Assistant construct | Current behavior |
 | --- | --- |
 | `trigger` / `triggers` | Parsed and visualized; nested Trigger Lists are flattened into Home Assistant leaf/runtime order |
-| purpose-specific triggers | Generic readable type + entity/device/area/floor/label target context, without hard-coding every integration |
+| purpose-specific triggers | Generic readable dotted type + entity/device/area/floor/label target context + compact integration-specific scalar details, without hard-coding every integration |
 | `enabled` boolean / template | Disabled elements remain visible but are excluded from execution paths; templated enabled state is marked runtime-dependent and static paths include both run/skip possibilities |
 | `condition` / `conditions` | Parsed as stop/continue decisions with common summaries |
 | logical condition shorthands | `condition: [...]`, `and`, `or`, and `not` are normalized, including inline action conditions |
-| purpose-specific conditions | Generic readable type + target context |
+| purpose-specific conditions | Generic readable dotted type + target context + compact integration-specific scalar details |
 | `action` / `actions` / `service` | Parsed and inventoried |
 | `service_template` | Preserved as a service action |
 | `sequence` | Nested ordered sequence |
@@ -25,7 +25,7 @@ HA Lens is a static, read-only analyzer. “Supported” means a construct is pr
 | `variables` | Action node |
 | `stop` / `error` | Terminal node; error stops are called out |
 | `note` / `continue_on_error` / `response_variable` | Surfaced in graph/insights where applicable |
-| target entity/device/area/floor/label | Collected semantically; template target strings are not misreported as concrete IDs |
+| target entity/device/area/floor/label | Collected semantically; template target strings are marked runtime-resolved and are never misreported as concrete IDs |
 | scene and script shortcuts | Normalized/inventoried where statically resolvable |
 | Home Assistant device actions | Parsed as supported action nodes, including entity-registry IDs |
 | Jinja templates | Preserved; common static entity references extracted but not evaluated |
@@ -49,20 +49,20 @@ HA Lens is a static, read-only analyzer. “Supported” means a construct is pr
 | Branch coverage | Taken branches green; known sibling non-taken branches orange/dashed; unreached graph dimmed |
 | Repeat runtime coverage | Observed iteration count and concrete iteration index where available |
 | Parallel runtime coverage | Observed/configured branch counts; only observed branches marked executed |
-| Automation diff | Local baseline comparison for added / changed / removed graph nodes; generated HA trigger IDs do not create false changes |
+| Automation diff | Local baseline comparison for added / changed / removed graph nodes; generated HA trigger IDs and matching Triggered by references can churn without creating false changes |
 | Local snapshots | Versioned local JSON containing automation YAML plus minimal snapshot metadata only; trace and registry metadata are intentionally excluded |
-| Optional lint | User-triggered advisory static checks only; findings never replace Home Assistant validation |
+| Optional lint | User-triggered advisory checks only; includes shared/dangling Triggered by diagnostics and Home Assistant 2026.10 state-condition duration restrictions; findings never replace Home Assistant validation |
 | Write-back | Not implemented; integration remains read-only |
 
 ## Security and compatibility guardrails
 
-- Companion viewer is sandboxed and uses nonce-authenticated parent/child messaging.
+- Companion viewer is sandboxed and uses a nonce-authenticated MessageChannel when available, with a bounded nonce-checked postMessage fallback.
 - Sandboxed opaque-origin viewer assets are served from a dedicated CORS-enabled static route; Home Assistant data still crosses only the bounded nonce-authenticated message channel.
 - Incoming trace/reference payloads are schema-filtered and bounded.
 - Parser nesting and execution-path expansion are bounded.
 - Dependency installation is lockfile-based; CI audits dependencies and produces a CycloneDX SBOM.
 - GitHub Actions are pinned by immutable SHAs and write permission is restricted to publish/release jobs.
-- Automated contract checks cover current Home Assistant Stable and Beta lines, including Home Assistant boolean-or-template `enabled` schema semantics.
+- Automated contract checks cover Home Assistant 2026.9.4, current 2026.10.1 Stable, and the final 2026.10 beta tag, including dynamic trigger/condition platform subscriptions, boolean-or-template `enabled`, no-ID trace storage, and stricter 2026.10 state-duration validation.
 
 ## Deliberate limitations
 

@@ -8,6 +8,7 @@ class HaLensPanel extends HTMLElement {
     this._panel = null;
     this._selected = "";
     this._pendingMessage = null;
+    this._messagePort = null;
     this._registryPromise = null;
     this._relatedCache = new Map();
     this._iconPathCache = new Map();
@@ -43,6 +44,8 @@ class HaLensPanel extends HTMLElement {
 
   disconnectedCallback() {
     window.removeEventListener("message", this._onWindowMessage);
+    this._messagePort?.close?.();
+    this._messagePort = null;
   }
 
   _viewerUrl() {
@@ -200,7 +203,7 @@ class HaLensPanel extends HTMLElement {
       if (this._selected) void this._loadAutomation(this._selected);
     });
 
-    this._frame.addEventListener("load", () => this._sendPending());
+    this._frame.addEventListener("load", () => this._bootstrapViewerChannel());
     this._applyPanelConfig();
     void this._refreshAutomations();
   }
@@ -498,8 +501,13 @@ class HaLensPanel extends HTMLElement {
   }
 
   async _latestTraces(automation) {
-    if (!automation?.automationId || !this._hass?.callWS) {
-      return { execution: null, diagnostic: null };
+    if (!this._hass?.callWS) {
+      return { execution: null, diagnostic: null, unavailableReason: "websocket_unavailable" };
+    }
+    if (!automation?.automationId) {
+      // Home Assistant 2026.10.1 deliberately does not store automation traces
+      // when the automation has no config ID (core #185161).
+      return { execution: null, diagnostic: null, unavailableReason: "automation_without_id" };
     }
 
     try {
@@ -510,7 +518,7 @@ class HaLensPanel extends HTMLElement {
         item_id: itemId,
       });
       if (!Array.isArray(traces) || !traces.length) {
-        return { execution: null, diagnostic: null };
+        return { execution: null, diagnostic: null, unavailableReason: null };
       }
 
       const ordered = [...traces].sort((left, right) =>
@@ -528,10 +536,11 @@ class HaLensPanel extends HTMLElement {
       return {
         execution: execution?.notTriggered ? null : execution,
         diagnostic: diagnostic?.notTriggered ? diagnostic : null,
+        unavailableReason: null,
       };
     } catch (error) {
       console.warn("HA Lens could not load automation traces", error);
-      return { execution: null, diagnostic: null };
+      return { execution: null, diagnostic: null, unavailableReason: "trace_api_error" };
     }
   }
 
@@ -797,7 +806,9 @@ class HaLensPanel extends HTMLElement {
         automationReferences: resolvedReferences,
         trace: traces.execution,
         triggerDiagnostic: traces.diagnostic,
+        traceUnavailableReason: traces.unavailableReason,
         homeAssistantUnavailable: Boolean(selected?.unavailable),
+        homeAssistantVersion: this._compactString(this._hass?.config?.version, 80),
       };
 
       this._sendPending();
@@ -820,17 +831,47 @@ class HaLensPanel extends HTMLElement {
     }
   }
 
+  _bootstrapViewerChannel() {
+    if (!this._frame?.contentWindow) return;
+    if (typeof MessageChannel !== "function") {
+      this._sendPending();
+      return;
+    }
+
+    this._messagePort?.close?.();
+    const channel = new MessageChannel();
+    this._messagePort = channel.port1;
+    this._messagePort.onmessage = (event) => {
+      if (event.data?.nonce !== this._channelNonce) return;
+      if (event.data?.type === "ha-lens:ready") this._sendPending();
+    };
+    this._messagePort.start?.();
+
+    this._frame.contentWindow.postMessage(
+      { type: "ha-lens:channel", version: 3, nonce: this._channelNonce },
+      "*",
+      [channel.port2],
+    );
+  }
+
   _sendPending() {
     if (!this._pendingMessage || !this._frame?.contentWindow) return;
-    this._frame.contentWindow.postMessage(
-      { ...this._pendingMessage, nonce: this._channelNonce },
-      "*",
-    );
+    const message = { ...this._pendingMessage, nonce: this._channelNonce };
+    if (this._messagePort) {
+      this._messagePort.postMessage(message);
+      return;
+    }
+    // Legacy/fallback path for browsers without MessageChannel support.
+    this._frame.contentWindow.postMessage(message, "*");
   }
 
   _onWindowMessage(event) {
     if (!this._frame?.contentWindow || event.source !== this._frame.contentWindow) return;
     if (event.data?.nonce !== this._channelNonce) return;
+    if (event.data?.type === "ha-lens:channel-request") {
+      this._bootstrapViewerChannel();
+      return;
+    }
     if (event.data?.type === "ha-lens:ready") this._sendPending();
   }
 

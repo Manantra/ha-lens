@@ -1114,3 +1114,18 @@ button.ghost { background: transparent; color: #dce3f5; }
 .lint-issue__body small { color: #8794a9; font-size: 8.5px; line-height: 1.45; overflow-wrap: anywhere; }
 .lint-issue__severity { color: #6f7d94; font-size: 7px; font-weight: 850; text-transform: uppercase; }
 .lint-issue--warning .lint-issue__severity { color: #d5ad61; }
+
+
+.ha-version-note {
+  display: inline-flex;
+  width: fit-content;
+  margin-bottom: 8px;
+  padding: 3px 7px;
+  border: 1px solid #33415b;
+  border-radius: 999px;
+  background: #151d2a;
+  color: #9fb2d8;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: .02em;
+}

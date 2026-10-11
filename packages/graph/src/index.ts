@@ -1,4 +1,4 @@
-import { getEnablementState } from "@ha-lens/model";
+import { getEnablementState, hasDynamicTarget } from "@ha-lens/model";
 import type { AutomationGraph, AutomationModel, GraphEdge, GraphNode, SequenceItem, UnknownRecord } from "@ha-lens/model";
 
 type Incoming = { id: string; label?: string };
@@ -24,6 +24,7 @@ function metadataSubtitle(raw: UnknownRecord, base?: string): string | undefined
     const note = raw.note.trim();
     parts.push(`Note: ${note.length > 72 ? `${note.slice(0, 69)}…` : note}`);
   }
+  if (hasDynamicTarget(raw)) parts.push("Dynamic target · resolved at runtime");
   if (raw.continue_on_error === true) parts.push("Continue on error");
   if (typeof raw.response_variable === "string" && raw.response_variable.trim()) {
     parts.push(`Response → ${raw.response_variable.trim()}`);

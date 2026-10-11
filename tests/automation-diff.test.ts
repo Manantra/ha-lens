@@ -229,6 +229,79 @@ actions: []
     expect(manual.nodeStates.get("triggers.0")).toBe("changed");
   });
 
+  it("treats 2026.10 generated Triggered by ID churn as semantically unchanged", () => {
+    const result = diff(
+      `
+alias: Generated refs
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+    to: "on"
+    id: generated-a3Xz
+conditions:
+  - condition: trigger
+    id: generated-a3Xz
+actions: []
+`,
+      `
+alias: Generated refs
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+    to: "on"
+    id: generated-b9Qp
+conditions:
+  - condition: trigger
+    id: generated-b9Qp
+actions: []
+`,
+    );
+
+    expect(result.stats.added).toBe(0);
+    expect(result.stats.removed).toBe(0);
+    expect(result.stats.changed).toBe(0);
+  });
+
+  it("still detects when a generated Triggered by condition moves to another trigger", () => {
+    const result = diff(
+      `
+alias: Generated refs
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+    to: "on"
+    id: generated-one1
+  - trigger: state
+    entity_id: binary_sensor.motion
+    to: "off"
+    id: generated-two2
+conditions:
+  - condition: trigger
+    id: generated-one1
+actions: []
+`,
+      `
+alias: Generated refs
+triggers:
+  - trigger: state
+    entity_id: binary_sensor.motion
+    to: "on"
+    id: generated-abcd
+  - trigger: state
+    entity_id: binary_sensor.motion
+    to: "off"
+    id: generated-efgh
+conditions:
+  - condition: trigger
+    id: generated-efgh
+actions: []
+`,
+    );
+
+    expect(result.stats.changed).toBe(1);
+    expect(result.nodeStates.get("conditions.0")).toBe("changed");
+  });
+
   it("reports runtime-affecting top-level metadata changes", () => {
     const result = diff(
       `

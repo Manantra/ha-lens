@@ -76,7 +76,23 @@ v0.1.36 carries the Home Assistant 2026 compatibility and security-hardening wor
 - [x] local read-only snapshots with a versioned schema and strict size/schema validation
 - [x] optional conservative lint rules with documented advisory semantics
 
-## Next after v0.1.36 validation
+## In progress — v0.1.37 Home Assistant 2026.10.1 parity
+
+- [x] validate against Home Assistant 2026.10.1 Stable and final 2026.10 beta (b7)
+- [x] keep generated Triggered by ID churn semantically stable in Automation Diff
+- [x] resolve shared manual trigger IDs to all matching trigger labels
+- [x] warn on dangling Triggered by references without rejecting valid shared IDs
+- [x] ignore/null-safe malformed trigger-list entries while preserving leaf runtime order
+- [x] surface templated targets as runtime-resolved instead of static target IDs
+- [x] improve purpose-specific trigger/condition row detail summaries
+- [x] surface wait timeout, stop-on-timeout, delay objects, repeat count/for-each detail
+- [x] mirror Home Assistant 2026.10 state-condition `for` validation in advisory lint
+- [x] explain Home Assistant 2026.10.1 no-ID trace storage behavior
+- [x] upgrade sandbox messaging to nonce-authenticated MessageChannel with legacy fallback
+- [x] expose the connected Home Assistant version in the viewer
+- [x] extend compatibility CI for dynamic trigger/condition platform subscriptions
+
+## Next after v0.1.37 validation
 
 - [ ] refine snapshot/lint UX only from real-world feedback
 - [ ] continue monitoring Home Assistant Stable/Beta automation contracts

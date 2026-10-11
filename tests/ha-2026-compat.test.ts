@@ -34,6 +34,32 @@ actions:
     expect(block.conditions[0].summary).toBe("Triggered by: Motion detected / missing-reference");
   });
 
+  it("keeps shared trigger IDs readable and ignores empty trigger-list entries", () => {
+    const { automation, warnings } = parseAutomationYaml(`
+alias: Shared trigger IDs
+triggers:
+  - null
+  - trigger: state
+    entity_id: binary_sensor.motion_a
+    id: shared-motion
+    alias: Motion A
+  - triggers:
+      - trigger: state
+        entity_id: binary_sensor.motion_b
+        id: shared-motion
+        alias: Motion B
+      - null
+conditions:
+  - condition: trigger
+    id: shared-motion
+actions: []
+`);
+
+    expect(automation.triggers).toHaveLength(2);
+    expect(automation.conditions[0].summary).toBe("Triggered by: Motion A / Motion B");
+    expect(warnings.some((warning) => warning.includes("Ignored 2 empty or invalid trigger entries"))).toBe(true);
+  });
+
   it("flattens nested trigger-list wrappers into Home Assistant runtime leaf order", () => {
     const { automation } = parseAutomationYaml(`
 alias: Trigger lists
@@ -90,6 +116,26 @@ actions:
     if (automation.actions[0].kind !== "inline-condition") throw new Error("expected inline condition");
     expect(automation.actions[0].condition.conditionType).toBe("or");
     expect(automation.actions[0].condition.children).toHaveLength(2);
+  });
+
+  it("surfaces templated service targets as runtime-resolved instead of static IDs", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Dynamic target
+triggers: []
+actions:
+  - action: light.turn_on
+    target: "{{ dynamic_target }}"
+`);
+
+    const analysis = analyzeAutomation(automation);
+    expect(automation.actions[0].dynamicTarget).toBe(true);
+    expect(analysis.targets).toEqual([]);
+    expect(analysis.insights.some((insight) =>
+      insight.nodeId === "actions.0" && insight.message.includes("templated target")
+    )).toBe(true);
+
+    const graph = buildAutomationGraph(automation);
+    expect(graph.nodes.find((node) => node.id === "actions.0")?.subtitle).toContain("Dynamic target");
   });
 
   it("does not report templated target strings as concrete IDs", () => {
@@ -355,6 +401,43 @@ actions:
     expect(analysis.insights.some((insight) => insight.nodeId === "actions.0" && insight.message.includes("continue"))).toBe(true);
     expect(analysis.insights.some((insight) => insight.nodeId === "actions.0" && insight.message.includes("forecast"))).toBe(true);
     expect(analysis.insights.some((insight) => insight.nodeId === "actions.1" && insight.level === "warning")).toBe(true);
+  });
+
+  it("keeps 2026.10 row-level timing and integration-specific details visible", () => {
+    const { automation } = parseAutomationYaml(`
+alias: Detail parity
+triggers:
+  - trigger: lawn_mower.activity
+    target:
+      entity_id: lawn_mower.garden
+    activity: idle
+  - trigger: sun
+    event: sunset
+    offset: "-00:10:00"
+conditions:
+  - condition: zwave_js.node_status
+    target:
+      device_id: device-zwave
+    status: alive
+actions:
+  - wait_for_trigger:
+      - trigger: state
+        entity_id: binary_sensor.door
+        to: "on"
+    timeout: "00:00:30"
+    continue_on_timeout: false
+  - delay:
+      seconds: 2
+`);
+
+    expect(automation.triggers[0].summary).toContain("Lawn Mower · Activity");
+    expect(automation.triggers[0].summary).toContain("activity: idle");
+    expect(automation.triggers[1].summary).toContain("-00:10:00");
+    expect(automation.conditions[0].summary).toContain("Zwave Js · Node Status");
+    expect(automation.conditions[0].summary).toContain("status: alive");
+    expect(automation.actions[0].summary).toContain("timeout 00:00:30");
+    expect(automation.actions[0].summary).toContain("stop on timeout");
+    expect(automation.actions[1].summary).toContain("s=2");
   });
 
   it("parses nested sequence, event, conversation response, and service_template actions", () => {

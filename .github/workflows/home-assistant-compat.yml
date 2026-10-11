@@ -37,12 +37,18 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Previous stable stays in the matrix to catch accidental regressions
+          # for users who do not upgrade Home Assistant immediately.
           - home_assistant: "2026.9.4"
             install_source: "homeassistant==2026.9.4"
-          # Pin the exact latest upstream beta tag commit so the compatibility
-          # contract stays reproducible even if prerelease mirrors lag behind.
-          - home_assistant: "2026.10.0b4"
-            install_source: "https://github.com/home-assistant/core/archive/e692d385440cdda4f5b95e7fc67d905f93125467.tar.gz"
+          # Current Home Assistant stable.
+          - home_assistant: "2026.10.1"
+            install_source: "homeassistant==2026.10.1"
+          # Final 2026.10 beta tag, pinned to the exact upstream commit.
+          # Keeping the prerelease contract is useful because several automation
+          # editor migrations landed during the beta cycle.
+          - home_assistant: "2026.10.0b7"
+            install_source: "https://github.com/home-assistant/core/archive/276922cfc37651b125d2c76f6c19f4ac6d4d990f.tar.gz"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
@@ -80,6 +86,10 @@ jobs:
               "homeassistant.components.automation": ("automation/config",),
               "homeassistant.components.search": ("search/related",),
               "homeassistant.components.trace.websocket_api": ("trace/list", "trace/get"),
+              "homeassistant.components.websocket_api.commands": (
+                  "trigger_platforms/subscribe",
+                  "condition_platforms/subscribe",
+              ),
               "homeassistant.components.config.floor_registry": ("config/floor_registry/list",),
               "homeassistant.components.config.label_registry": ("config/label_registry/list",),
           }
@@ -97,4 +107,24 @@ jobs:
               assert "Any(boolean, template)" in schema_block, f"enabled no longer accepts boolean-or-template in {schema_name}"
 
           print("HA Lens imports, WebSocket contracts, and enabled boolean/template semantics are available.")
+          PY
+      - name: Verify Home Assistant 2026.10.1 trace-without-ID contract
+        if: matrix.home_assistant == '2026.10.1'
+        run: |
+          python - <<'PY'
+          import importlib
+          import inspect
+
+          trace_module = importlib.import_module("homeassistant.components.automation.trace")
+          trace_source = inspect.getsource(trace_module.trace_automation)
+          assert "not_triggered: bool = False" in trace_source
+          assert "if automation_id:" in trace_source
+          assert "async_store_trace" in trace_source
+
+          cv_source = inspect.getsource(importlib.import_module("homeassistant.helpers.config_validation").STATE_CONDITION_SCHEMA)
+          assert "Cannot use 'for' with an attribute" in cv_source
+          assert "Cannot use 'for' with a list of states" in cv_source
+          assert "Cannot use 'for' with a state referencing an entity" in cv_source
+
+          print("HA 2026.10.1 trace-ID storage and stricter state-duration validation contracts are present.")
           PY
