@@ -1,5 +1,7 @@
 # HA Lens
 
+![HA Lens logo](assets/ha-lens-logo.png)
+
 **Understand every path through your Home Assistant automation.**
 
 HA Lens is a read-only visualizer and analyzer for Home Assistant automations. It turns automation YAML into a semantic flow graph, execution paths, entity/action inventory, structural insights, deterministic explanations, and—inside Home Assistant—a view of the latest runtime trace.
