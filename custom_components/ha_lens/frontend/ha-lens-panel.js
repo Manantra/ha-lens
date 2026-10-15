@@ -99,12 +99,23 @@ class HaLensPanel extends HTMLElement {
 
         .brand {
           min-width: max-content;
+          display: flex;
+          align-items: center;
+          gap: 7px;
           font-weight: 800;
           color: #eef2ff;
         }
 
-        .brand span {
-          color: #7c9cff;
+        .brand-icon {
+          width: 32px;
+          height: 32px;
+          flex: 0 0 32px;
+          border-radius: 8px;
+          object-fit: contain;
+        }
+
+        .brand-name {
+          color: #eef2ff;
         }
 
         .brand .version {
@@ -176,7 +187,7 @@ class HaLensPanel extends HTMLElement {
       </style>
       <div class="shell">
         <div class="toolbar">
-          <div class="brand"><span>◉</span> HA Lens <small class="version"></small></div>
+          <div class="brand"><img class="brand-icon" src="/ha_lens_static/brand/icon.png" alt="" aria-hidden="true" /><span class="brand-name">HA Lens</span><small class="version"></small></div>
           <input class="automation-search" type="search" placeholder="Filter automations…" aria-label="Filter automations" />
           <select aria-label="Home Assistant automation">
             <option value="">Select an automation…</option>
@@ -191,6 +202,7 @@ class HaLensPanel extends HTMLElement {
     this._select = this.shadowRoot.querySelector("select");
     this._status = this.shadowRoot.querySelector(".status");
     this._version = this.shadowRoot.querySelector(".version");
+    this._brandIcon = this.shadowRoot.querySelector(".brand-icon");
     this._frame = this.shadowRoot.querySelector("iframe");
 
     this._search.addEventListener("input", () => {
@@ -213,6 +225,7 @@ class HaLensPanel extends HTMLElement {
     const version = this._panel?.config?.version;
     if (this._version) {
       this._version.textContent = version ? "v" + String(version) : "";
+      if (this._brandIcon && version) this._brandIcon.src = `/ha_lens_static/brand/icon.png?v=${encodeURIComponent(String(version))}`;
       this._version.title = version ? "Loaded HA Lens integration version " + String(version) : "";
     }
     const viewerUrl = new URL(this._viewerUrl(), window.location.origin);

@@ -60,6 +60,15 @@ Until HA Lens is published in a default HACS catalog:
 4. Go to **Settings → Devices & services → Add integration** and add **HA Lens**.
 5. Open **HA Lens** from the sidebar.
 
+
+## Branding and icons
+
+Home Assistant 2026.3+ reads HA Lens branding from `custom_components/ha_lens/brand/icon.png` and `logo.png` via its local Brands API. The HA Lens panel header also loads the bundled icon directly from `/ha_lens_static/brand/icon.png`. A full Home Assistant restart after installing a new branded HACS version may be needed for brand discovery.
+
+The sidebar navigation icon intentionally remains `mdi:vector-polyline`: Home Assistant's custom panel registration accepts an icon identifier there rather than a PNG logo.
+
+**Known upstream HACS issue:** As of October 2026, HACS's own store cards may still show "Icon not available" for custom integrations using the official local-brand mechanism. This is a HACS frontend issue (see [HACS #5402](https://github.com/hacs/integration/issues/5402) and [HACS frontend #937](https://github.com/hacs/frontend/pull/937)), not missing HA Lens assets. Check the integration card under Home Assistant Settings → Devices & services and the HA Lens toolbar to verify the actual local branding.
+
 ## Deliberate limitations
 
 - Read-only and admin-only.

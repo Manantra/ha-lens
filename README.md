@@ -1,6 +1,6 @@
 # HA Lens
 
-![HA Lens logo](assets/ha-lens-logo.png)
+![HA Lens logo](https://raw.githubusercontent.com/Manantra/ha-lens/main/assets/ha-lens-logo.png)
 
 **Understand every path through your Home Assistant automation.**
 

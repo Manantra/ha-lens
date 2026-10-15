@@ -24,6 +24,17 @@ jobs:
           python -m json.tool custom_components/ha_lens/strings.json > /dev/null
           python -m json.tool hacs.json > /dev/null
           node --check custom_components/ha_lens/frontend/ha-lens-panel.js
+          python - <<'PY'
+          from pathlib import Path
+          from struct import unpack
+          for name in ("icon.png", "logo.png"):
+              path = Path("custom_components/ha_lens/brand") / name
+              image = path.read_bytes()
+              assert image.startswith(bytes.fromhex("89504e470d0a1a0a")), f"{name} is not PNG"
+              width, height = unpack(">II", image[16:24])
+              assert width == height and width >= 128, f"{name} dimensions invalid: {width}x{height}"
+          assert Path("custom_components/ha_lens/frontend/brand/icon.png").is_file()
+          PY
       - name: Install dependencies reproducibly
         run: npm ci --ignore-scripts
       - name: Dependency security audit
