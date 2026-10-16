@@ -57,6 +57,28 @@ describe("HA Lens localization", () => {
     expect(localizeNarrative("target.entity_id", "de")).toBe("target.entity_id");
   });
 
+  it("keeps CSS status identifiers stable in every locale", () => {
+    const app = readFileSync("apps/web/src/App.tsx", "utf8");
+    expect(app).toContain("diff-change--${change.status}");
+    expect(app).toContain("diff-change__status--${change.status}");
+    expect(app).toContain("lint-issue--${issue.severity}");
+    expect(app).toContain("target-card__kind--${target.kind}");
+    expect(app).toContain('aria-label={t("Graph view mode")}');
+    expect(app).toContain('language={language}');
+  });
+
+  it("has localized configuration flow entries for every supported language", () => {
+    for (const language of LANGUAGE_CODES) {
+      const file = readFileSync(`custom_components/ha_lens/translations/${language}.json`, "utf8");
+      const messages = JSON.parse(file);
+      expect(messages.title).toBe("HA Lens");
+      expect(messages.config.step.user.title).toContain("HA Lens");
+      expect(messages.config.step.user.description).toContain("Home Assistant");
+      expect(messages.config.abort.single_instance_allowed.length).toBeGreaterThan(20);
+    }
+    expect(JSON.parse(readFileSync("custom_components/ha_lens/translations/pt-BR.json", "utf8")).title).toBe("HA Lens");
+  });
+
   it("loads the panel catalog from the local Home Assistant route", () => {
     const panel = readFileSync("custom_components/ha_lens/frontend/ha-lens-panel.js", "utf8");
     expect(panel).toContain('this._hass?.locale?.language');

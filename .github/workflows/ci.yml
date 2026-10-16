@@ -22,6 +22,8 @@ jobs:
           python -m compileall -q custom_components/ha_lens
           python -m json.tool custom_components/ha_lens/manifest.json > /dev/null
           python -m json.tool custom_components/ha_lens/strings.json > /dev/null
+          for file in custom_components/ha_lens/translations/*.json; do python -m json.tool "$file" > /dev/null; done
+          python -m json.tool custom_components/ha_lens/frontend/i18n.json > /dev/null
           python -m json.tool hacs.json > /dev/null
           node --check custom_components/ha_lens/frontend/ha-lens-panel.js
           python - <<'PY'

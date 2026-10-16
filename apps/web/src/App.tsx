@@ -51,10 +51,10 @@ function formatTraceResult(value: unknown, language: Language): string | null {
 
   const record = value as Record<string, unknown>;
   if (typeof record.result === "boolean") return translate(record.result ? "condition: true" : "condition: false", language);
-  if (record.choice != null) return `choice: ${String(record.choice)}`;
+  if (record.choice != null) return `${translate("choice", language)}: ${String(record.choice)}`;
   if (record.timeout === true) return translate("timeout", language);
-  if (record.stop != null) return `stop: ${String(record.stop)}`;
-  if (record.delay != null) return `delay: ${String(record.delay)}`;
+  if (record.stop != null) return `${translate("stop", language)}: ${String(record.stop)}`;
+  if (record.delay != null) return `${translate("delay", language)}: ${String(record.delay)}`;
   if (record.wait && typeof record.wait === "object") {
     const wait = record.wait as Record<string, unknown>;
     if (typeof wait.completed === "boolean") return translate(wait.completed ? "wait completed" : "wait incomplete", language);
@@ -566,7 +566,7 @@ export function App() {
           <div className="tagline">{t("See what your Home Assistant automation can do.")}</div>
         </div>
         <div className="topbar__actions">
-          <select aria-label="Language" value={language} onChange={(event) => setLanguage(normalizeLanguage(event.target.value))} style={{maxWidth: 135, flex: "0 0 auto"}}>
+          <select aria-label={t("Language")} value={language} onChange={(event) => setLanguage(normalizeLanguage(event.target.value))} style={{maxWidth: 135, flex: "0 0 auto"}}>
             {LANGUAGE_CODES.map((code) => <option key={code} value={code}>{LANGUAGE_LABELS[code]}</option>)}
           </select>
           <button className="ghost" onClick={() => { setYaml(sampleAutomation); setBaselineYaml(sampleAutomation); setEntityMetadata({}); setTargetMetadata({}); setAutomationReferences({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); setLintEnabled(false); }}>{t("Load example")}</button>
@@ -608,20 +608,20 @@ export function App() {
           <div className="panel__header">
             <strong>{result.ok ? result.automation.alias : t("Automation map")}</strong>
             <div className="panel__header-actions">
-              <div className="graph-fit-controls" aria-label="Graph fit mode">
+              <div className="graph-fit-controls" aria-label={t("Graph fit mode")}>
                 <button
                   className={`ghost fit-toggle ${graphFitMode === "all" ? "is-active" : ""}`}
                   onClick={() => setGraphFitMode("all")}
                   title={t("Fit the complete graph into the available canvas")}
                 >
-                  Fit all
+                  {t("Fit all")}
                 </button>
                 <button
                   className={`ghost fit-toggle ${graphFitMode === "width" ? "is-active" : ""}`}
                   onClick={() => setGraphFitMode("width")}
                   title={t("Fit graph to the available width; pan vertically for tall automations")}
                 >
-                  Fit width
+                  {t("Fit width")}
                 </button>
               </div>
               {yamlCollapsed && (
@@ -634,7 +634,7 @@ export function App() {
                 </button>
               )}
               {trace && result.ok && (
-                <div className="run-view-controls" aria-label="Graph view mode">
+                <div className="run-view-controls" aria-label={t("Graph view mode")}>
                   <button
                     className={`trace-toggle ${!showTrace ? "is-active is-structure" : ""}`}
                     onClick={() => {
@@ -643,7 +643,7 @@ export function App() {
                     }}
                     title={t("Show the complete static automation structure")}
                   >
-                    Structure
+                    {t("Structure")}
                   </button>
                   <button
                     className={`trace-toggle ${showTrace ? "is-active" : ""}`}
@@ -653,7 +653,7 @@ export function App() {
                     }}
                     title={t("Compare the latest Home Assistant run with the static structure")}
                   >
-                    Last run
+                    {t("Last run")}
                   </button>
                 </div>
               )}
@@ -668,8 +668,8 @@ export function App() {
                   <strong>{t("Entity focus active")} · {entityFocus.name}</strong>
                   <span>
                     {entityFocus.nodeCount} {t("matching graph nodes highlighted")}
-                    {entityFocus.referenceCount !== entityFocus.nodeCount ? ` · ${entityFocus.referenceCount} {t("specific references")}` : ""}.
-                    Unrelated nodes are dimmed.
+                    {entityFocus.referenceCount !== entityFocus.nodeCount ? ` · ${entityFocus.referenceCount} ${t("specific references")}` : ""}.
+                    {t("Unrelated nodes are dimmed.")}
                   </span>
                   <code>{entityFocus.entityId}</code>
                 </div>
@@ -678,14 +678,14 @@ export function App() {
             )}
             <div className="graph-canvas">
               {diffActive && automationDiff && (
-                <div className="diff-legend" aria-label="Automation diff legend">
+                <div className="diff-legend" aria-label={t("Automation diff legend")}>
                   <span><i className="diff-dot is-added" />{t("Added")}</span>
                   <span><i className="diff-dot is-changed" />{t("Changed")}</span>
                   <span><i className="diff-dot is-removed" />{t("Removed")}</span>
                 </div>
               )}
               {trace && showTrace && result.ok && !diffActive && (
-                <div className="run-coverage-legend" aria-label="Last run coverage legend">
+                <div className="run-coverage-legend" aria-label={t("Last run coverage legend")}>
                   <span><i className="run-coverage-dot is-executed" />{t("Executed")}</span>
                   <span><i className="run-coverage-line is-not-taken" />{t("Branch not taken")}</span>
                   <span><i className="run-coverage-dot is-not-reached" />{t("Not reached")}</span>
@@ -886,7 +886,7 @@ export function App() {
                         : t("Static only");
                     return (
                       <div className="target-card" key={`${t(target.kind)}:${target.id}`}>
-                        <span className={`target-card__kind target-card__kind--${t(target.kind)}`}>{t(target.kind)}</span>
+                        <span className={`target-card__kind target-card__kind--${target.kind}`}>{t(target.kind)}</span>
                         <span className="target-card__identity">
                           <strong>{targetName}</strong>
                           {targetName !== target.id && <code>{target.id}</code>}
@@ -894,10 +894,10 @@ export function App() {
                         <small
                           className={`target-card__status target-card__status--${target.homeAssistantResolved ? "ha" : "static"}`}
                           title={target.homeAssistantResolved && !target.staticResolved
-                            ? "Resolved by Home Assistant but not found by the static HA Lens parser"
+                            ? t("Resolved by Home Assistant but not found by the static HA Lens parser")
                             : target.staticResolved && !target.homeAssistantResolved
-                              ? "Found statically; Home Assistant did not return it from related/runtime target resolution"
-                              : "Found statically and resolved by Home Assistant"}
+                              ? t("Found statically; Home Assistant did not return it from related/runtime target resolution")
+                              : t("Found statically and resolved by Home Assistant")}
                         >
                           {status}
                         </small>
@@ -911,7 +911,7 @@ export function App() {
                 <div className="diff-header">
                   <div>
                     <h3>{t("Automation Diff")}</h3>
-                    <p>Baseline: {baselineResult.ok ? baselineResult.automation.alias : t("invalid baseline")}</p>
+                    <p>{t("Baseline")}: {baselineResult.ok ? baselineResult.automation.alias : t("invalid baseline")}</p>
                   </div>
                   <button
                     className="ghost diff-baseline-button"
@@ -922,7 +922,7 @@ export function App() {
                     }}
                     title={t("Use the current local YAML as the new comparison baseline")}
                   >
-                    Set current as baseline
+                    {t("Set current as baseline")}
                   </button>
                 </div>
                 <div className="section-intro">
@@ -945,14 +945,14 @@ export function App() {
                           return (
                             <button
                               key={change.key}
-                              className={`diff-change diff-change--${t(change.status[0].toUpperCase() + change.status.slice(1))} ${selected ? "is-active" : ""}`}
+                              className={`diff-change diff-change--${change.status} ${selected ? "is-active" : ""}`}
                               disabled={!change.graphNodeId}
                               onClick={() => {
                                 if (!change.graphNodeId) return;
                                 setSelectedDiffNodeId(selected ? null : change.graphNodeId);
                               }}
                             >
-                              <span className={`diff-change__status diff-change__status--${t(change.status[0].toUpperCase() + change.status.slice(1))}`}>{t(change.status[0].toUpperCase() + change.status.slice(1))}</span>
+                              <span className={`diff-change__status diff-change__status--${change.status}`}>{t(change.status[0].toUpperCase() + change.status.slice(1))}</span>
                               <span className="diff-change__body">
                                 <strong>{localizeNarrative(change.label, language)}</strong>
                                 <small>{t(change.kind)}{change.detail ? ` · ${localizeNarrative(change.detail, language)}` : ""}</small>
@@ -1002,7 +1002,7 @@ export function App() {
                         setShowTrace(true);
                       }}
                     >
-                      Show full run
+                      {t("Show full run")}
                     </button>
                   )}
                 </div>
@@ -1097,7 +1097,7 @@ export function App() {
                     {lintIssues.length ? (
                       <div className="lint-list">
                         {lintIssues.map((issue, index) => (
-                          <div className={`lint-issue lint-issue--${t(issue.severity)}`} key={`${issue.ruleId}-${issue.nodeId || index}`}>
+                          <div className={`lint-issue lint-issue--${issue.severity}`} key={`${issue.ruleId}-${issue.nodeId || index}`}>
                             <span className="lint-issue__id">{issue.ruleId}</span>
                             <span className="lint-issue__body">
                               <strong>{localizeNarrative(issue.title, language)}</strong>
