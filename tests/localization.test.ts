@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import catalog from "../custom_components/ha_lens/frontend/i18n.json";
-import { LANGUAGE_CODES, normalizeLanguage, translate, translationKeys } from "../apps/web/src/i18n";
+import { LANGUAGE_CODES, normalizeLanguage, translate, translationKeys, localizeNarrative } from "../apps/web/src/i18n";
 
 describe("HA Lens localization", () => {
   it("resolves Home Assistant UI locales and falls back safely", () => {
@@ -39,6 +39,22 @@ describe("HA Lens localization", () => {
     }
     expect(translate("Summary", "de")).toBe("Übersicht");
     expect(translate("Paths", "es")).toBe("Recorridos");
+  });
+
+  it("translates generated explanations and lint findings without rewriting technical values", () => {
+    expect(localizeNarrative("Starts when binary_sensor.motion turns on.", "de"))
+      .toBe("Startet, wenn binary_sensor.motion turns on.");
+    expect(localizeNarrative("Stops at light.turn_off", "es"))
+      .toBe("Se detiene en light.turn_off");
+    expect(localizeNarrative("Completes: light.turn_on", "pt"))
+      .toBe("Conclui em: light.turn_on");
+    expect(localizeNarrative("No automatic triggers", "pl")).toBe("Brak automatycznych wyzwalaczy");
+    expect(localizeNarrative("This wait has no timeout and may pause indefinitely.", "ru"))
+      .toBe("У ожидания нет ограничения по времени, поэтому оно может длиться бесконечно.");
+    expect(localizeNarrative("3 trigger/condition blocks are shown generically because HA Lens does not recognize a more specific type.", "tr"))
+      .toContain("3 tetikleyici/koşul bloğu");
+    expect(localizeNarrative("Custom automation name", "de")).toBe("Custom automation name");
+    expect(localizeNarrative("target.entity_id", "de")).toBe("target.entity_id");
   });
 
   it("loads the panel catalog from the local Home Assistant route", () => {

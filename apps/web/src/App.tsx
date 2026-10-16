@@ -18,7 +18,7 @@ import { sampleAutomation } from "./sample";
 import { buildAutomationDiff } from "./automationDiff";
 import { createAutomationSnapshot, parseAutomationSnapshot, serializeAutomationSnapshot, snapshotFilename } from "./snapshot";
 import { lintAutomation } from "./lint";
-import { LANGUAGE_CODES, LANGUAGE_LABELS, normalizeLanguage, translate, type Language } from "./i18n";
+import { LANGUAGE_CODES, LANGUAGE_LABELS, localizeNarrative, normalizeLanguage, translate, type Language } from "./i18n";
 import {
   sanitizeAutomationReferences,
   sanitizeCompanionTrace,
@@ -790,12 +790,12 @@ export function App() {
                 <div className="section-intro">{t("Select a path to highlight it in the map.")}</div>
                 {result.paths.map((path) => (
                   <button key={path.id} className={`path-card ${selectedPath?.id === path.id ? "is-active" : ""}`} onClick={() => { setSelectedEntity(null); setSelectedPath(selectedPath?.id === path.id ? null : path); }}>
-                    <span className={`outcome outcome--${path.outcome}`}>{path.outcome}</span>
-                    <strong>{path.title}</strong>
+                    <span className={`outcome outcome--${path.outcome}`}>{t(path.outcome)}</span>
+                    <strong>{localizeNarrative(path.title, language)}</strong>
                     <span>{path.steps.length} {t("steps")}</span>
                   </button>
                 ))}
-                {selectedPath && <ol className="path-steps">{selectedPath.steps.map((step, index) => <li key={`${step.nodeId}-${index}`}><strong>{step.label}</strong>{step.detail && <span>{step.detail}</span>}</li>)}</ol>}
+                {selectedPath && <ol className="path-steps">{selectedPath.steps.map((step, index) => <li key={`${step.nodeId}-${index}`}><strong>{localizeNarrative(step.label, language)}</strong>{step.detail && <span>{localizeNarrative(step.detail, language)}</span>}</li>)}</ol>}
               </div>
             ) : tab === "entities" ? (
               <>
@@ -954,13 +954,13 @@ export function App() {
                             >
                               <span className={`diff-change__status diff-change__status--${t(change.status[0].toUpperCase() + change.status.slice(1))}`}>{t(change.status[0].toUpperCase() + change.status.slice(1))}</span>
                               <span className="diff-change__body">
-                                <strong>{change.label}</strong>
-                                <small>{t(change.kind)}{change.detail ? ` · ${change.detail}` : ""}</small>
+                                <strong>{localizeNarrative(change.label, language)}</strong>
+                                <small>{t(change.kind)}{change.detail ? ` · ${localizeNarrative(change.detail, language)}` : ""}</small>
                                 {change.beforeLabel && change.afterLabel && change.beforeLabel !== change.afterLabel && (
                                   <span className="diff-change__transition">
-                                    <span>{change.beforeLabel}</span>
+                                    <span>{localizeNarrative(change.beforeLabel, language)}</span>
                                     <b>→</b>
-                                    <span>{change.afterLabel}</span>
+                                    <span>{localizeNarrative(change.afterLabel, language)}</span>
                                   </span>
                                 )}
                               </span>
@@ -1036,13 +1036,13 @@ export function App() {
                       >
                         <span className="trace-step__number">{index + 1}</span>
                         <span className="trace-step__body">
-                          <strong>{semanticLabel || node?.label || step.path}</strong>
+                          <strong>{localizeNarrative(semanticLabel || node?.label || step.path, language)}</strong>
                           {traceContext.length > 0 && (
                             <span className="trace-step__context" title={traceContext.join(" → ")}>
                               {traceContext.map((part, contextIndex) => (
                                 <span key={`${part}-${contextIndex}`}>
                                   {contextIndex > 0 && <i aria-hidden="true">→</i>}
-                                  <b>{part}</b>
+                                  <b>{localizeNarrative(part, language)}</b>
                                 </span>
                               ))}
                             </span>
@@ -1060,7 +1060,7 @@ export function App() {
                                 const targetName = targetMetadata[semanticKind]?.[id]?.name || id;
                                 return (
                                   <small key={`${kind}:${id}`} title={targetName !== id ? id : undefined}>
-                                    <b>{semanticKind}</b>{targetName}
+                                    <b>{t(semanticKind)}</b>{targetName}
                                   </small>
                                 );
                               }))}
@@ -1077,7 +1077,7 @@ export function App() {
             ) : tab === "insights" ? (
               <>
                 <div className="section-intro">{t("These are structural observations, not validation errors.")}</div>
-                {result.analysis.insights.length ? result.analysis.insights.map((insight, index) => <div className={`insight insight--${insight.level}`} key={`${insight.nodeId}-${index}`}>{insight.message}</div>) : <div className="empty-state">{t("No structural insights for this automation.")}</div>}
+                {result.analysis.insights.length ? result.analysis.insights.map((insight, index) => <div className={`insight insight--${insight.level}`} key={`${insight.nodeId}-${index}`}>{localizeNarrative(insight.message, language)}</div>) : <div className="empty-state">{t("No structural insights for this automation.")}</div>}
               </>
             ) : tab === "lint" ? (
               <div className="lint-panel">
@@ -1100,8 +1100,8 @@ export function App() {
                           <div className={`lint-issue lint-issue--${t(issue.severity)}`} key={`${issue.ruleId}-${issue.nodeId || index}`}>
                             <span className="lint-issue__id">{issue.ruleId}</span>
                             <span className="lint-issue__body">
-                              <strong>{issue.title}</strong>
-                              <small>{issue.detail}</small>
+                              <strong>{localizeNarrative(issue.title, language)}</strong>
+                              <small>{localizeNarrative(issue.detail, language)}</small>
                             </span>
                             <span className="lint-issue__severity">{t(issue.severity)}</span>
                           </div>
@@ -1116,7 +1116,7 @@ export function App() {
               <>
                 <div className="section-intro">{t("A deterministic explanation generated from the parsed automation structure. No AI or cloud processing is used.")}</div>
                 <div className="explanation-list">
-                  {result.explanation.map((line, index) => <p key={index}><span>{index + 1}</span>{line}</p>)}
+                  {result.explanation.map((line, index) => <p key={index}><span>{index + 1}</span>{localizeNarrative(line, language)}</p>)}
                 </div>
               </>
             )}
