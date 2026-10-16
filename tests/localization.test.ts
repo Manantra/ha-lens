@@ -79,6 +79,21 @@ describe("HA Lens localization", () => {
     expect(JSON.parse(readFileSync("custom_components/ha_lens/translations/pt-BR.json", "utf8")).title).toBe("HA Lens");
   });
 
+  it("covers every literal localization key used by the UI and companion", () => {
+    const sources = [
+      ["apps/web/src/App.tsx", /\\bt\\(["']([^"'\\x60]+)["']\\)/g],
+      ["apps/web/src/LensNode.tsx", /\\bt\\(["']([^"'\\x60]+)["']\\)/g],
+      ["custom_components/ha_lens/frontend/ha-lens-panel.js", /\\._t\\(["']([^"'\\x60]+)["']\\)/g],
+    ] as const;
+    const dictionary = new Set(translationKeys);
+    for (const [path, pattern] of sources) {
+      const source = readFileSync(path, "utf8");
+      for (const match of source.matchAll(pattern)) {
+        expect(dictionary.has(match[1]), `${path}: missing localization key "${match[1]}"`).toBe(true);
+      }
+    }
+  });
+
   it("loads the panel catalog from the local Home Assistant route", () => {
     const panel = readFileSync("custom_components/ha_lens/frontend/ha-lens-panel.js", "utf8");
     expect(panel).toContain('this._hass?.locale?.language');
