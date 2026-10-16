@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import catalog from "../custom_components/ha_lens/frontend/i18n.json";
-import { LANGUAGE_CODES, normalizeLanguage, translate, translationKeys, localizeNarrative } from "../apps/web/src/i18n";
+import { LANGUAGE_CODES, formatQuantity, localizeGeneratedEdgeLabel, localizeGeneratedGraphLabel, localizeGeneratedGraphSubtitle, normalizeLanguage, translate, translationKeys, localizeNarrative } from "../apps/web/src/i18n";
+import { buildAutomationGraph } from "@ha-lens/graph";
+import { parseAutomationYaml } from "@ha-lens/parser";
 
 describe("HA Lens localization", () => {
   it("resolves Home Assistant UI locales and falls back safely", () => {
@@ -55,6 +57,71 @@ describe("HA Lens localization", () => {
       .toContain("3 tetikleyici/koşul bloğu");
     expect(localizeNarrative("Custom automation name", "de")).toBe("Custom automation name");
     expect(localizeNarrative("target.entity_id", "de")).toBe("target.entity_id");
+  });
+
+  it("uses natural quantity forms in English, German, Turkish, Polish and Russian", () => {
+    expect(formatQuantity(1, "entities", "en")).toBe("1 entity");
+    expect(formatQuantity(5, "entities", "en")).toBe("5 entities");
+    expect(formatQuantity(1, "entities", "de")).toBe("1 Entität");
+    expect(formatQuantity(5, "entities", "de")).toBe("5 Entitäten");
+    expect(formatQuantity(4, "execution paths", "tr")).toBe("4 çalışma yolu");
+    expect(formatQuantity(3, "decision points", "tr")).toBe("3 karar noktası");
+    expect(formatQuantity(1, "execution paths", "ru")).toBe("1 путь выполнения");
+    expect(formatQuantity(4, "execution paths", "ru")).toBe("4 пути выполнения");
+    expect(formatQuantity(5, "execution paths", "ru")).toBe("5 путей выполнения");
+    expect(formatQuantity(3, "decision points", "ru")).toBe("3 точки принятия решений");
+    expect(formatQuantity(5, "entities", "pl")).toBe("5 encji");
+    expect(formatQuantity(22, "entities", "pl")).toBe("22 encje");
+  });
+
+  it("translates generated graph labels, subtitles, and edges while preserving raw values", () => {
+    for (const language of LANGUAGE_CODES) {
+      expect(localizeGeneratedGraphLabel("light.living_room", language)).toBe("light.living_room");
+      expect(localizeGeneratedGraphSubtitle("Note: Condition failed · light.living_room", language))
+        .toContain("Condition failed · light.living_room");
+    }
+    expect(localizeGeneratedGraphLabel("Condition failed", "de")).toBe("Bedingung nicht erfüllt");
+    expect(localizeGeneratedGraphLabel("If / then / else", "de")).toBe("Wenn / dann / sonst");
+    expect(localizeGeneratedGraphLabel("Choose (2 options)", "es")).toBe("Elegir (2 opciones)");
+    expect(localizeGeneratedGraphLabel("Delay 00:00:02", "ru")).toBe("Задержка 00:00:02");
+    expect(localizeGeneratedGraphSubtitle("First matching option wins · Note: Continue · entity_id", "de"))
+      .toBe("Die erste passende Option wird ausgeführt · Hinweis: Continue · entity_id");
+    expect(localizeGeneratedEdgeLabel("Option 3", "pl")).toBe("Opcja 3");
+    expect(localizeGeneratedEdgeLabel("branch 2", "tr")).toBe("dal 2");
+    expect(localizeGeneratedEdgeLabel("true", "de")).toBe("wahr");
+  });
+
+  it("marks only generated graph labels as translatable, not user-authored aliases", () => {
+    const yaml = [
+      "alias: Graph locale test",
+      "triggers:",
+      "  - trigger: state",
+      "    entity_id: binary_sensor.motion",
+      "actions:",
+      "  - choose:",
+      "      - alias: Continue",
+      "        conditions:",
+      "          - condition: state",
+      "            entity_id: input_boolean.mode",
+      "            state: 'on'",
+      "        sequence:",
+      "          - alias: Completed",
+      "            action: light.turn_on",
+      "            target:",
+      "              entity_id: light.living_room",
+      "      - conditions:",
+      "          - condition: template",
+      "            value_template: '{{ true }}'",
+      "        sequence:",
+      "          - delay: '00:00:01'",
+    ].join("\n");
+    const { automation } = parseAutomationYaml(yaml);
+    const graph = buildAutomationGraph(automation);
+    expect(graph.nodes.find((n) => n.label === "Completed")?.generatedLabel).toBe(false);
+    expect(graph.edges.find((e) => e.label === "Continue")?.generatedLabel).toBe(false);
+    expect(graph.edges.find((e) => e.label === "Option 2")?.generatedLabel).toBe(true);
+    expect(graph.nodes.find((n) => n.label === "Continue" && n.kind === "merge")?.generatedLabel).toBe(true);
+    expect(graph.nodes.find((n) => n.label === "Delay 00:00:01")?.generatedLabel).toBe(true);
   });
 
   it("keeps CSS status identifiers stable in every locale", () => {

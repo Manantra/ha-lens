@@ -18,7 +18,7 @@ import { sampleAutomation } from "./sample";
 import { buildAutomationDiff } from "./automationDiff";
 import { createAutomationSnapshot, parseAutomationSnapshot, serializeAutomationSnapshot, snapshotFilename } from "./snapshot";
 import { lintAutomation } from "./lint";
-import { LANGUAGE_CODES, LANGUAGE_LABELS, localizeNarrative, normalizeLanguage, translate, type Language } from "./i18n";
+import { LANGUAGE_CODES, LANGUAGE_LABELS, formatQuantity, localizeNarrative, normalizeLanguage, translate, type Language } from "./i18n";
 import {
   sanitizeAutomationReferences,
   sanitizeCompanionTrace,
@@ -1125,7 +1125,7 @@ export function App() {
       </section>
 
       <footer className={`statusbar ${result.ok ? "statusbar--ok" : "statusbar--error"}`}>
-        {result.ok ? `${t("Parsed successfully")} · ${result.analysis.entities.length} ${t("entities")} · ${result.paths.length} ${t("execution paths")} · ${result.analysis.stats.decisionPoints} ${t("decision points")}` : result.error}
+        {result.ok ? `${t("Parsed successfully")} · ${formatQuantity(result.analysis.entities.length, "entities", language)} · ${formatQuantity(result.paths.length, "execution paths", language)} · ${formatQuantity(result.analysis.stats.decisionPoints, "decision points", language)}` : result.error}
       </footer>
     </main>
   );

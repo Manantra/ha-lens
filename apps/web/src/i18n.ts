@@ -93,3 +93,115 @@ export function localizeNarrative(text: string, language: Language): string {
   if (suffix) return suffix[1] + " → " + translate(suffix[2], language);
   return text;
 }
+
+/** Human-facing quantities use locale-specific noun forms instead of English-style plural suffixes. */
+export type QuantityKind = "entities" | "execution paths" | "decision points";
+type Forms = readonly [string, string, string, string]; // one, few, many, other
+const QUANTITIES: Record<Language, Record<QuantityKind, Forms>> = {
+  en: {
+    entities: ["entity", "entities", "entities", "entities"],
+    "execution paths": ["execution path", "execution paths", "execution paths", "execution paths"],
+    "decision points": ["decision point", "decision points", "decision points", "decision points"],
+  },
+  de: {
+    entities: ["Entität", "Entitäten", "Entitäten", "Entitäten"],
+    "execution paths": ["Ausführungspfad", "Ausführungspfade", "Ausführungspfade", "Ausführungspfade"],
+    "decision points": ["Entscheidungspunkt", "Entscheidungspunkte", "Entscheidungspunkte", "Entscheidungspunkte"],
+  },
+  es: {
+    entities: ["entidad", "entidades", "entidades", "entidades"],
+    "execution paths": ["recorrido de ejecución", "recorridos de ejecución", "recorridos de ejecución", "recorridos de ejecución"],
+    "decision points": ["punto de decisión", "puntos de decisión", "puntos de decisión", "puntos de decisión"],
+  },
+  pt: {
+    entities: ["entidade", "entidades", "entidades", "entidades"],
+    "execution paths": ["percurso de execução", "percursos de execução", "percursos de execução", "percursos de execução"],
+    "decision points": ["ponto de decisão", "pontos de decisão", "pontos de decisão", "pontos de decisão"],
+  },
+  tr: {
+    entities: ["varlık", "varlık", "varlık", "varlık"],
+    "execution paths": ["çalışma yolu", "çalışma yolu", "çalışma yolu", "çalışma yolu"],
+    "decision points": ["karar noktası", "karar noktası", "karar noktası", "karar noktası"],
+  },
+  pl: {
+    entities: ["encja", "encje", "encji", "encji"],
+    "execution paths": ["ścieżka wykonania", "ścieżki wykonania", "ścieżek wykonania", "ścieżki wykonania"],
+    "decision points": ["punkt decyzyjny", "punkty decyzyjne", "punktów decyzyjnych", "punktu decyzyjnego"],
+  },
+  ru: {
+    entities: ["сущность", "сущности", "сущностей", "сущности"],
+    "execution paths": ["путь выполнения", "пути выполнения", "путей выполнения", "пути выполнения"],
+    "decision points": ["точка принятия решений", "точки принятия решений", "точек принятия решений", "точки принятия решений"],
+  },
+};
+const pluralRules = Object.fromEntries(
+  LANGUAGE_CODES.map((language) => [language, new Intl.PluralRules(language)]),
+) as Record<Language, Intl.PluralRules>;
+
+export function formatQuantity(value: number, kind: QuantityKind, language: Language): string {
+  const category = pluralRules[language].select(value);
+  const index = category === "one" ? 0 : category === "few" ? 1 : category === "many" ? 2 : 3;
+  return String(value) + " " + QUANTITIES[language][kind][index];
+}
+
+/** Only apply this to graph nodes explicitly identified as HA Lens-generated text. */
+export function localizeGeneratedGraphLabel(text: string, language: Language): string {
+  if (language === "en") return text;
+  const exact = translate(text, language);
+  if (exact !== text) return exact;
+
+  const wait = text.match(/^(Wait for template|Wait for trigger)(.*)$/);
+  if (wait) return translate(wait[1], language) + wait[2]
+    .replace(/\btimeout\b/g, translate("timeout", language))
+    .replace(/stop on timeout/g, translate("Stop on timeout", language));
+  const patterns: readonly [RegExp, string, string][] = [
+    [/^Choose \((\d+) option\)$/, "Choose ({count} option)", "count"],
+    [/^Choose \((\d+) options\)$/, "Choose ({count} options)", "count"],
+    [/^Parallel \((\d+) branch\)$/, "Parallel ({count} branch)", "count"],
+    [/^Parallel \((\d+) branches\)$/, "Parallel ({count} branches)", "count"],
+    [/^Sequence \((\d+) step\)$/, "Sequence ({count} step)", "count"],
+    [/^Sequence \((\d+) steps\)$/, "Sequence ({count} steps)", "count"],
+    [/^Delay (.+)$/, "Delay {value}", "value"],
+    [/^Fire event: (.+)$/, "Fire event: {value}", "value"],
+    [/^Stop: (.+)$/, "Stop: {value}", "value"],
+    [/^Activate scene → (.+)$/, "Activate scene → {value}", "value"],
+  ];
+  for (const [pattern, key, name] of patterns) {
+    const match = text.match(pattern);
+    if (match) return translate(key, language, { [name]: match[1] });
+  }
+  return text;
+}
+
+/** Render known system metadata while preserving any user-authored note verbatim. */
+export function localizeGeneratedGraphSubtitle(subtitle: string, language: Language): string {
+  if (language === "en") return subtitle;
+  // Keep the complete user note untouched, including delimiters or words identical to UI labels.
+  const noteStart = subtitle.indexOf(" · Note: ");
+  const noteOnly = subtitle.startsWith("Note: ");
+  const systemSubtitle = noteOnly ? "" : noteStart >= 0 ? subtitle.slice(0, noteStart) : subtitle;
+  const noteSuffix = noteOnly ? subtitle.slice(6) : noteStart >= 0 ? subtitle.slice(noteStart + " · Note: ".length) : null;
+  const translatedSystem = systemSubtitle.split(" · ").map((part) => {
+    const exact = translate(part, language);
+    if (exact !== part) return exact;
+    if (part.startsWith("Device action · ")) {
+      return translate("Device action", language) + part.slice("Device action".length);
+    }
+    if (part.startsWith("Response → ")) {
+      return translate("Response", language) + part.slice("Response".length);
+    }
+    return part;
+  }).join(" · ");
+  return noteSuffix === null ? translatedSystem
+    : (translatedSystem ? translatedSystem + " · " : "") + translate("Note", language) + ": " + noteSuffix;
+}
+
+/** This is only for edges marked as generated. User-supplied branch aliases are not localized. */
+export function localizeGeneratedEdgeLabel(label: string, language: Language): string {
+  if (language === "en") return label;
+  const exact = translate(label, language);
+  if (exact !== label) return exact;
+  const match = label.match(/^(branch|Option) (\d+)$/);
+  if (match) return translate(match[1] === "branch" ? "branch {index}" : "Option {index}", language, { index: match[2] });
+  return label;
+}

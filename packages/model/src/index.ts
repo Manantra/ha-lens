@@ -237,6 +237,8 @@ export interface GraphNode {
   id: string;
   kind: "trigger" | "condition" | "action" | "control" | "wait" | "loop" | "parallel" | "stop" | "merge" | "unknown" | "end";
   label: string;
+  /** True only for HA Lens-generated presentation text, never user aliases. */
+  generatedLabel?: boolean;
   subtitle?: string;
   disabled?: boolean;
   dynamicEnabled?: boolean;
@@ -247,6 +249,8 @@ export interface GraphEdge {
   source: string;
   target: string;
   label?: string;
+  /** True when this edge label is generated, not a user-supplied branch alias. */
+  generatedLabel?: boolean;
 }
 
 export interface AutomationGraph {

@@ -2,7 +2,7 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { GraphNode } from "@ha-lens/model";
 import type { GraphEntityIcon } from "./AutomationGraph";
 import type { DiffStatus } from "./automationDiff";
-import { translate, type Language } from "./i18n";
+import { localizeGeneratedGraphLabel, localizeGeneratedGraphSubtitle, translate, type Language } from "./i18n";
 
 type LensNodeData = GraphNode & {
   runtimeBadge?: string;
@@ -67,8 +67,8 @@ export function LensNode({ data, selected }: NodeProps) {
           )}
         </div>
       </div>
-      <div className="lens-node__label">{node.label}</div>
-      {node.subtitle && <div className="lens-node__subtitle">{node.subtitle}</div>}
+      <div className="lens-node__label" title={node.generatedLabel ? localizeGeneratedGraphLabel(node.label, node.language || "en") : node.label}>{node.generatedLabel ? localizeGeneratedGraphLabel(node.label, node.language || "en") : node.label}</div>
+      {node.subtitle && <div className="lens-node__subtitle">{localizeGeneratedGraphSubtitle(node.subtitle, node.language || "en")}</div>}
       <Handle type="source" position={Position.Bottom} />
     </div>
   );

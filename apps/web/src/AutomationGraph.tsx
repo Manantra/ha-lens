@@ -3,7 +3,7 @@ import { Background, Controls, MiniMap, ReactFlow, type Edge, type Node, type Re
 import type { AutomationGraph as AutomationGraphModel } from "@ha-lens/model";
 import type { DiffStatus } from "./automationDiff";
 import { LensNode } from "./LensNode";
-import type { Language } from "./i18n";
+import { localizeGeneratedEdgeLabel, type Language } from "./i18n";
 import { layoutGraph } from "./layout";
 
 const nodeTypes = { lens: LensNode };
@@ -59,6 +59,7 @@ export function AutomationGraph({
   const [edges, setEdges] = useState<Edge[]>([]);
   const [flow, setFlow] = useState<ReactFlowInstance<Node, Edge> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const generatedEdgeIds = useMemo(() => new Set(graph.edges.filter((edge) => edge.generatedLabel).map((edge) => edge.id)), [graph]);
   const structuralNodeIds = useMemo(
     () => new Set(
       graph.nodes
@@ -156,6 +157,7 @@ export function AutomationGraph({
 
       return {
         ...edge,
+        label: generatedEdgeIds.has(edge.id) && typeof edge.label === "string" ? localizeGeneratedEdgeLabel(edge.label, language) : edge.label,
         className: [
           highlightedNodeIds.size && !(highlightedNodeIds.has(edge.source) && highlightedNodeIds.has(edge.target)) ? "is-dimmed" : "",
           executed ? "is-traced is-run-executed" : "",
@@ -165,7 +167,7 @@ export function AutomationGraph({
         ].filter(Boolean).join(" "),
       };
     }),
-    [diffActive, diffEdgeStates, edges, highlightedNodeIds, traceCoverageActive, traceEdgeIds, traceNotTakenEdgeIds],
+    [diffActive, diffEdgeStates, edges, generatedEdgeIds, highlightedNodeIds, language, traceCoverageActive, traceEdgeIds, traceNotTakenEdgeIds],
   );
 
   return (
