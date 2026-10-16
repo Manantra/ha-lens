@@ -72,6 +72,8 @@ No write action is registered. The compiled visualizer is bundled into the integ
 
 See [`docs/hacs-companion.md`](docs/hacs-companion.md) for installation, architecture, privacy notes, and current limitations.
 
+For a complete project handoff (including release status, locale rules, test plan, and next-chat prompt), see [`docs/NEXT_CHAT_HANDOFF.md`](docs/NEXT_CHAT_HANDOFF.md).
+
 ## Supported automation structure
 
 The parser recognizes top-level and nested trigger lists, boolean and templated runtime `enabled` states, logical-condition shorthands, `if/then/else`, `choose/default`, nested `sequence`, inline conditions, delays, waits, repeat variants, parallel branches, variables, stop, event actions, conversation responses, scene shortcuts, direct/targeted script calls, device actions, normal/service-template actions, and purpose-specific Home Assistant targets.
