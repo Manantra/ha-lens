@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "apps/web/**"
+      - "custom_components/ha_lens/frontend/i18n.json"
       - "packages/**"
       - "package.json"
       - "package-lock.json"
