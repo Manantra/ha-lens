@@ -6,7 +6,7 @@
 
 HA Lens is a read-only visualizer and analyzer for Home Assistant automations. It turns automation YAML into a semantic flow graph, execution paths, entity/action inventory, structural insights, deterministic explanations, and—inside Home Assistant—a view of the latest runtime trace.
 
-> Current stable companion release: **v0.1.36**. The 0.1.37 beta line adds Home Assistant 2026.10.1 parity and branding. The upcoming **v0.1.38 beta** introduces seven-language localization that follows the Home Assistant user's interface language. HA Lens remains intentionally read-only: it analyzes automations but does not execute or modify them.
+> Current stable companion release: **v0.1.36**. Latest published preview at the time of this README update: **v0.1.38-beta.2**, with seven-language localization, generated-graph-label translation and locale-aware quantity grammar. This beta has passed automated CI and Home Assistant compatibility checks but still needs user-assisted real-browser validation before becoming Stable. HA Lens remains read-only: it analyzes automations but does not execute or modify them.
 
 ## Why HA Lens?
 
@@ -94,11 +94,11 @@ The Home Assistant companion does **not** require GitHub Pages: HACS installs a 
 
 ## Roadmap
 
-The Home Assistant 2026 compatibility and security-hardening pass is complete in v0.1.35. The next development focus is:
+The Home Assistant 2026 compatibility and security-hardening work is available in Stable **v0.1.36**. The next focus is:
 
-- validate the v0.1.36 prerelease live inside Home Assistant
-- refine snapshot ergonomics only if real-world use shows a need
-- expand lint rules only when their semantics can stay conservative and well documented
+- live-test **v0.1.38-beta.2** in Home Assistant across the seven supported languages, including language switching and unchanged YAML
+- confirm responsive graph/Trace/Diff/Lint presentation, generated labels and language-specific plural forms
+- release v0.1.38 Stable only after the real-browser test passes; continue improving snapshot/lint UX only from user feedback
 
 See [`ROADMAP.md`](ROADMAP.md) for the detailed checklist.
 
