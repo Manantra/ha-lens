@@ -52,6 +52,8 @@ HA Lens is a static, read-only analyzer. “Supported” means a construct is pr
 | Automation diff | Local baseline comparison for added / changed / removed graph nodes; generated HA trigger IDs and matching Triggered by references can churn without creating false changes |
 | Local snapshots | Versioned local JSON containing automation YAML plus minimal snapshot metadata only; trace and registry metadata are intentionally excluded |
 | Optional lint | User-triggered advisory checks only; includes shared/dangling Triggered by diagnostics and Home Assistant 2026.10 state-condition duration restrictions; findings never replace Home Assistant validation |
+| Localization | English, German, Spanish, Portuguese, Turkish, Polish, Russian; follows Home Assistant user locale, regional variants mapped to base language, unsupported locales fall back to English |
+| Localized presentation | Automation picker, viewer navigation, graph badges and known HA Lens-generated guidance; YAML, entity IDs, user labels and raw integration/runtime strings remain unchanged |
 | Write-back | Not implemented; integration remains read-only |
 
 ## Security and compatibility guardrails
@@ -71,3 +73,5 @@ HA Lens is a static, read-only analyzer. “Supported” means a construct is pr
 - Loop iteration counts are not guessed statically when they depend on runtime state.
 - Parallel interleavings are not expanded combinatorially.
 - Runtime trace mapping remains best-effort for unusually deep or mixed control flow.
+- Home Assistant and third-party integrations can provide arbitrary error text, service names, aliases and values. These are displayed verbatim rather than mechanically translated.
+- Automated locale/catalog, TypeScript and Home Assistant contract tests do not replace manual cross-language visual QA on desktop and mobile; that remains pending for v0.1.38.

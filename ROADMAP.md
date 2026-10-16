@@ -92,7 +92,19 @@ v0.1.36 carries the Home Assistant 2026 compatibility and security-hardening wor
 - [x] expose the connected Home Assistant version in the viewer
 - [x] extend compatibility CI for dynamic trigger/condition platform subscriptions
 
-## Next after v0.1.37 validation
+## In progress — v0.1.38 multilingual interface
+
+- [x] seven-language offline interface: English, German, Spanish, Portuguese, Turkish, Polish, Russian
+- [x] automatically use the active Home Assistant user's interface language
+- [x] handle regional locales (for example `de-DE`, `pt-BR`) and fall back to English for unsupported languages
+- [x] react to user-interface language changes through the authenticated viewer channel
+- [x] translate companion automation picker, statuses, errors and configuration flow dialogs
+- [x] translate viewer controls, navigation, Diff/Trace/Lint status labels, path and advisory explanation text
+- [x] preserve Home Assistant and HA Lens branding, YAML keys, IDs, trace paths, and user-authored content verbatim
+- [x] standalone viewer language selection, complete translation catalogue tests, CSS/status invariants, automated build
+- [ ] live-check all seven languages, narrow viewport rendering, and language switching in an actual Home Assistant browser session
+
+## Next after v0.1.38 validation
 
 - [ ] refine snapshot/lint UX only from real-world feedback
 - [ ] continue monitoring Home Assistant Stable/Beta automation contracts
