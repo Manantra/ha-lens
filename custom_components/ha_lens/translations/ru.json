@@ -1,0 +1,14 @@
+{
+  "title": "HA Lens",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Добавить HA Lens",
+        "description": "Добавляет в боковую панель Home Assistant инструмент HA Lens для анализа автоматизаций в режиме только для чтения."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Можно настроить только один экземпляр HA Lens."
+    }
+  }
+}

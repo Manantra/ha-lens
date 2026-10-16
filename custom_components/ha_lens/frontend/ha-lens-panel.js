@@ -16,6 +16,9 @@ class HaLensPanel extends HTMLElement {
     this._automationListPromise = null;
     this._diagnosticsText = "";
     this._filterQuery = "";
+    this._language = "en";
+    this._catalog = null;
+    this._catalogPromise = null;
     this._targetOrigin = window.location.origin;
     this._channelNonce = globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
     this._onWindowMessage = this._onWindowMessage.bind(this);
@@ -23,6 +26,12 @@ class HaLensPanel extends HTMLElement {
 
   set hass(value) {
     this._hass = value;
+    const previousLanguage = this._language;
+    this._language = this._normalizeLanguage(value?.locale?.language || value?.language || navigator.language);
+    if (this.isConnected && previousLanguage !== this._language) {
+      this._refreshLanguage();
+      this._sendLocale();
+    }
     if (this.isConnected && !this._automationListPromise) {
       void this._refreshAutomations();
     }
@@ -52,11 +61,76 @@ class HaLensPanel extends HTMLElement {
     return this._panel?.config?.viewer_url || DEFAULT_VIEWER_URL;
   }
 
+  _normalizeLanguage(value) {
+    const code = String(value || "en").trim().toLowerCase().replace(/_/g, "-").split("-")[0];
+    return ["en", "de", "es", "pt", "tr", "pl", "ru"].includes(code) ? code : "en";
+  }
+
+  _t(key) {
+    if (!this._catalog) return key;
+    const languageIndex = this._catalog.languages?.indexOf(this._language) ?? -1;
+    const translated = languageIndex >= 0 ? this._translations?.get(key)?.[languageIndex] : null;
+    return typeof translated === "string" ? translated : key;
+  }
+
+  _loadLocaleCatalog() {
+    if (this._catalogPromise) return this._catalogPromise;
+    const version = this._panel?.config?.version || "";
+    this._catalogPromise = fetch(`/ha_lens_static/i18n.json?v=${encodeURIComponent(String(version))}`, {
+      credentials: "same-origin",
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error("Unable to load HA Lens translations");
+        return response.json();
+      })
+      .then((data) => {
+        if (!Array.isArray(data?.rows) || !Array.isArray(data?.languages)) throw new Error("Invalid HA Lens translations");
+        this._catalog = data;
+        this._translations = new Map(data.rows.map((row) => [row[0], row]));
+        this._refreshLanguage();
+      })
+      .catch((error) => console.warn("HA Lens localization unavailable; using English", error));
+    return this._catalogPromise;
+  }
+
+  _refreshLanguage() {
+    if (!this._search) return;
+    this._search.placeholder = this._t("Filter automations…");
+    this._search.setAttribute("aria-label", this._t("Filter automations…"));
+    this._version.title = this._t("Loaded HA Lens integration version") + " " + (this._panel?.config?.version || "");
+    this._syncAutomations();
+    const chosen = this._automationItems.find((item) => item.entityId === this._selected);
+    this._updateDiagnostics();
+    if (chosen) this._setStatus(
+      chosen.name + (chosen.unavailable ? " · " + this._t("unavailable in Home Assistant") : "")
+      + (this._diagnosticsText ? " · " + this._diagnosticsText : ""), Boolean(chosen.unavailable));
+    else this._setStatus(this._automationItems.length
+      ? this._t("Read-only") + " · " + this._diagnosticsText
+      : this._t("Read-only · select an automation"), false);
+  }
+
+  _sendLocale() {
+    const msg = { type: "ha-lens:locale", nonce: this._channelNonce, language: this._language };
+    if (this._pendingMessage) this._pendingMessage.language = this._language;
+    if (this._messagePort) this._messagePort.postMessage(msg);
+    else this._frame?.contentWindow?.postMessage(msg, "*");
+  }
+
+  _updateDiagnostics() {
+    const unavailable = this._automationItems.filter((item) => item.unavailable).length;
+    const available = this._automationItems.length - unavailable;
+    const details = [`${available} ${this._t("available")}`];
+    if (unavailable) details.push(`${unavailable} ${this._t("unavailable")}`);
+    details.push(`${this._automationItems.length} ${this._t("loaded by Home Assistant")}`);
+    this._diagnosticsText = details.join(" · ");
+  }
+
   _embeddedUrl() {
     const url = new URL(this._viewerUrl(), window.location.origin);
     const version = this._panel?.config?.version;
     if (version) url.searchParams.set("v", String(version));
     url.searchParams.set("embedded", "1");
+    url.searchParams.set("lang", this._language);
     url.searchParams.set("channel", this._channelNonce);
     return url.toString();
   }
@@ -204,6 +278,7 @@ class HaLensPanel extends HTMLElement {
     this._version = this.shadowRoot.querySelector(".version");
     this._brandIcon = this.shadowRoot.querySelector(".brand-icon");
     this._frame = this.shadowRoot.querySelector("iframe");
+    this._language = this._normalizeLanguage(this._hass?.locale?.language || this._hass?.language || navigator.language);
 
     this._search.addEventListener("input", () => {
       this._filterQuery = this._search.value.trim().toLocaleLowerCase();
@@ -217,6 +292,7 @@ class HaLensPanel extends HTMLElement {
 
     this._frame.addEventListener("load", () => this._bootstrapViewerChannel());
     this._applyPanelConfig();
+    void this._loadLocaleCatalog();
     void this._refreshAutomations();
   }
 
@@ -226,7 +302,7 @@ class HaLensPanel extends HTMLElement {
     if (this._version) {
       this._version.textContent = version ? "v" + String(version) : "";
       if (this._brandIcon && version) this._brandIcon.src = `/ha_lens_static/brand/icon.png?v=${encodeURIComponent(String(version))}`;
-      this._version.title = version ? "Loaded HA Lens integration version " + String(version) : "";
+      this._version.title = version ? this._t("Loaded HA Lens integration version") + " " + String(version) : "";
     }
     const viewerUrl = new URL(this._viewerUrl(), window.location.origin);
     this._targetOrigin = viewerUrl.origin;
@@ -255,25 +331,20 @@ class HaLensPanel extends HTMLElement {
           }))
           .sort((left, right) => left.name.localeCompare(right.name));
 
-        const unavailable = this._automationItems.filter((item) => item.unavailable).length;
-        const available = this._automationItems.length - unavailable;
-        const diagnostics = [`${available} available`];
-        if (unavailable > 0) diagnostics.push(`${unavailable} unavailable`);
-        diagnostics.push(`${this._automationItems.length} loaded by Home Assistant`);
-        this._diagnosticsText = diagnostics.join(" · ");
+        this._updateDiagnostics();
 
         this._syncAutomations();
         this._setStatus(
           this._automationItems.length
-            ? `Read-only · ${this._diagnosticsText}`
-            : "No automations loaded by Home Assistant",
+            ? this._t("Read-only") + " · " + this._diagnosticsText
+            : this._t("No automations loaded by Home Assistant"),
           false,
         );
       })
       .catch((error) => {
         console.error("HA Lens could not list automations", error);
         const message = error?.message || error?.code || String(error);
-        this._setStatus(`Could not list automations: ${message}`, true);
+        this._setStatus(`${this._t("Could not list automations")}: ${message}`, true);
         this._automationItems = [];
         this._syncAutomations();
       })
@@ -300,17 +371,17 @@ class HaLensPanel extends HTMLElement {
     const placeholder = document.createElement("option");
     placeholder.value = "";
     placeholder.textContent = !automations.length
-      ? "No automations found"
+      ? this._t("No automations found")
       : visible.length
-        ? "Select an automation…"
-        : "No matching automations";
+        ? this._t("Select an automation…")
+        : this._t("No matching automations");
     this._select.append(placeholder);
 
     for (const automation of visible) {
       const option = document.createElement("option");
       option.value = automation.entityId;
       option.textContent = automation.unavailable ? `⚠ ${automation.name}` : automation.name;
-      if (automation.unavailable) option.title = "Home Assistant reports this automation as unavailable";
+      if (automation.unavailable) option.title = this._t("Home Assistant reports this automation as unavailable");
       this._select.append(option);
     }
 
@@ -321,14 +392,14 @@ class HaLensPanel extends HTMLElement {
   }
 
   async _automationConfig(entityId) {
-    if (!this._hass?.callWS) throw new Error("Home Assistant WebSocket API is unavailable.");
+    if (!this._hass?.callWS) throw new Error(this._t("Home Assistant WebSocket API is unavailable."));
     const response = await this._hass.callWS({
       type: "automation/config",
       entity_id: entityId,
     });
     const config = response?.config;
     if (!config || typeof config !== "object" || Array.isArray(config)) {
-      throw new Error(`Home Assistant did not return a readable config for ${entityId}.`);
+      throw new Error(`${this._t("Home Assistant did not return a readable config for")} ${entityId}.`);
     }
     return config;
   }
@@ -790,11 +861,11 @@ class HaLensPanel extends HTMLElement {
 
   async _loadAutomation(entityId) {
     if (!this._hass?.callWS) {
-      this._setStatus("Home Assistant WebSocket API is unavailable.", true);
+      this._setStatus(this._t("Home Assistant WebSocket API is unavailable."), true);
       return;
     }
 
-    this._setStatus("Loading automation…", false);
+    this._setStatus(this._t("Loading automation…"), false);
 
     try {
       const selected = this._automations().find((automation) => automation.entityId === entityId);
@@ -822,11 +893,12 @@ class HaLensPanel extends HTMLElement {
         traceUnavailableReason: traces.unavailableReason,
         homeAssistantUnavailable: Boolean(selected?.unavailable),
         homeAssistantVersion: this._compactString(this._hass?.config?.version, 80),
+        language: this._language,
       };
 
       this._sendPending();
       const selectedLabel = selected ? selected.name : entityId;
-      const availabilityLabel = selected?.unavailable ? " · unavailable in Home Assistant" : "";
+      const availabilityLabel = selected?.unavailable ? " · " + this._t("unavailable in Home Assistant") : "";
       this._setStatus(
         this._diagnosticsText
           ? `${selectedLabel}${availabilityLabel} · ${this._diagnosticsText}`
@@ -840,7 +912,7 @@ class HaLensPanel extends HTMLElement {
         || error?.code
         || (typeof error === "string" ? error : null)
         || "Unknown Home Assistant WebSocket error";
-      this._setStatus(`Could not read automation: ${message}`, true);
+      this._setStatus(`${this._t("Could not read automation")}: ${message}`, true);
     }
   }
 

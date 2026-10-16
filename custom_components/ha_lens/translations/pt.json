@@ -1,0 +1,14 @@
+{
+  "title": "HA Lens",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Adicionar HA Lens",
+        "description": "Adiciona o analisador de automações HA Lens, apenas de leitura, à barra lateral do Home Assistant."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Só é possível configurar uma instância do HA Lens."
+    }
+  }
+}

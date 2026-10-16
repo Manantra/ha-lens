@@ -2,12 +2,14 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { GraphNode } from "@ha-lens/model";
 import type { GraphEntityIcon } from "./AutomationGraph";
 import type { DiffStatus } from "./automationDiff";
+import { translate, type Language } from "./i18n";
 
 type LensNodeData = GraphNode & {
   runtimeBadge?: string;
   runtimeBadgeTone?: "good" | "partial" | "neutral";
   entityIcons?: GraphEntityIcon[];
   diffStatus?: DiffStatus;
+  language?: Language;
 };
 
 function NodeEntityIcons({ icons }: { icons: GraphEntityIcon[] }) {
@@ -37,27 +39,28 @@ function NodeEntityIcons({ icons }: { icons: GraphEntityIcon[] }) {
 export function LensNode({ data, selected }: NodeProps) {
   const node = data as unknown as LensNodeData;
   const entityIcons = node.entityIcons ?? [];
+  const t = (key: string) => translate(key, node.language || "en");
 
   return (
     <div className={`lens-node lens-node--${node.kind} ${node.disabled ? "is-disabled" : ""} ${node.dynamicEnabled ? "is-dynamic-enabled" : ""} ${selected ? "is-selected" : ""}`}>
       <Handle type="target" position={Position.Top} />
       <div className="lens-node__topline">
         <div className="lens-node__kind-row">
-          <div className="lens-node__kind">{node.kind}</div>
+          <div className="lens-node__kind">{t(node.kind)}</div>
           <NodeEntityIcons icons={entityIcons} />
         </div>
         <div className="lens-node__badges">
-          {node.disabled && <div className="lens-node__disabled-badge">disabled</div>}
-          {!node.disabled && node.dynamicEnabled && <div className="lens-node__dynamic-enabled-badge">runtime enabled</div>}
+          {node.disabled && <div className="lens-node__disabled-badge">{t("disabled")}</div>}
+          {!node.disabled && node.dynamicEnabled && <div className="lens-node__dynamic-enabled-badge">{t("runtime enabled")}</div>}
           {node.diffStatus && (
             <div className={`lens-node__diff-badge lens-node__diff-badge--${node.diffStatus}`}>
-              {node.diffStatus === "added" ? "+ added" : node.diffStatus === "removed" ? "− removed" : "~ changed"}
+              {node.diffStatus === "added" ? "+ " + t("Added") : node.diffStatus === "removed" ? "− " + t("Removed") : "~ " + t("Changed")}
             </div>
           )}
           {node.runtimeBadge && (
             <div
               className={`lens-node__runtime-badge lens-node__runtime-badge--${node.runtimeBadgeTone || "neutral"}`}
-              title="Observed in the latest Home Assistant run"
+              title={t("Observed in the latest Home Assistant run")}
             >
               {node.runtimeBadge}
             </div>

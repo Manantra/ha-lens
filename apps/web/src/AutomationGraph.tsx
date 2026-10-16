@@ -3,6 +3,7 @@ import { Background, Controls, MiniMap, ReactFlow, type Edge, type Node, type Re
 import type { AutomationGraph as AutomationGraphModel } from "@ha-lens/model";
 import type { DiffStatus } from "./automationDiff";
 import { LensNode } from "./LensNode";
+import type { Language } from "./i18n";
 import { layoutGraph } from "./layout";
 
 const nodeTypes = { lens: LensNode };
@@ -23,6 +24,7 @@ export interface GraphEntityIcon {
 
 export function AutomationGraph({
   graph,
+  language = "en",
   highlightedNodeIds,
   traceNodeIds,
   traceEdgeIds,
@@ -38,6 +40,7 @@ export function AutomationGraph({
   fitMode = "all",
 }: {
   graph: AutomationGraphModel;
+  language?: Language;
   highlightedNodeIds: Set<string>;
   traceNodeIds: Set<string>;
   traceEdgeIds?: Set<string>;
@@ -132,6 +135,7 @@ export function AutomationGraph({
           runtimeBadgeTone: runtimeBadge?.tone,
           entityIcons: nodeEntityIcons?.get(node.id) ?? [],
           diffStatus,
+          language,
         },
         className: [
           highlightedNodeIds.size && !highlightedNodeIds.has(node.id) ? "is-dimmed" : "",
@@ -141,7 +145,7 @@ export function AutomationGraph({
         ].filter(Boolean).join(" "),
       };
     }),
-    [nodes, diffActive, diffNodeStates, highlightedNodeIds, nodeEntityIcons, structuralNodeIds, traceCoverageActive, traceNodeBadges, traceNodeIds],
+    [nodes, diffActive, diffNodeStates, language, highlightedNodeIds, nodeEntityIcons, structuralNodeIds, traceCoverageActive, traceNodeBadges, traceNodeIds],
   );
   const displayEdges = useMemo(
     () => edges.map((edge) => {

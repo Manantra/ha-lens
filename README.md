@@ -32,6 +32,7 @@ Visual flow editors are great for *building* automations. HA Lens is deliberatel
 - Run optional conservative lint checks on demand; lint findings are advisory and never replace Home Assistant validation.
 - Understand Home Assistant 2026.10 Triggered by references, including generated-ID churn, shared manual IDs, dangling references, and the new state-condition duration validation rules.
 - Keep templated targets explicit as runtime-resolved instead of pretending they are static entity/device/area/floor/label IDs.
+- Follow the Home Assistant user's interface language automatically: English, German, Spanish, Portuguese, Turkish, Polish, or Russian. The standalone viewer offers a manual language selector; unsupported locales fall back to English. YAML syntax, entity IDs, automation names, and Home Assistant brand names are not translated.
 
 ## Quick start
 

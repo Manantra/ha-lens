@@ -40,6 +40,12 @@ The compiled visualizer is shipped inside `custom_components/ha_lens/frontend/ap
 
 The viewer iframe is sandboxed without `allow-same-origin`. Because a sandboxed iframe has an opaque origin, its bundled HTML/JS/CSS is served from the dedicated read-only `/ha_lens_viewer/` endpoint with CORS enabled; this endpoint exposes only static viewer files, never Home Assistant data or credentials. Parent/child data uses a per-instance nonce-authenticated MessageChannel when supported; the window-message path remains only as a nonce-checked compatibility/bootstrap fallback. Incoming trace/reference metadata is schema-filtered and bounded before use.
 
+## Language and localization
+
+HA Lens adopts Home Assistant's active user-interface language (`hass.locale.language`). Supported languages are **English, German, Spanish, Portuguese, Turkish, Polish, and Russian**; regional variants such as `de-DE` and `pt-BR` use their base language. Unsupported languages use English. A change of the Home Assistant UI language updates the viewer over the authenticated, nonce-checked message channel without modifying automation YAML or saving a preference.
+
+The embedded panel and React viewer share the same offline translation catalogue bundled in `custom_components/ha_lens/frontend/i18n.json`. The standalone web viewer also allows selecting a supported language manually. Technical identifiers (YAML properties, entity IDs, user-defined aliases, Home Assistant product names, trace paths) remain unchanged so diagnostics stay accurate.
+
 ## Home Assistant compatibility
 
 The repository contains an automated contract workflow for the official Home Assistant interfaces HA Lens depends on. The current hardening line checks:

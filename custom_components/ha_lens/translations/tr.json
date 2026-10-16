@@ -1,0 +1,14 @@
+{
+  "title": "HA Lens",
+  "config": {
+    "step": {
+      "user": {
+        "title": "HA Lens ekle",
+        "description": "Salt okunur HA Lens otomasyon analiz aracını Home Assistant kenar çubuğuna ekler."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Yalnızca bir HA Lens örneği yapılandırılabilir."
+    }
+  }
+}

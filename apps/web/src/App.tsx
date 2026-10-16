@@ -18,6 +18,7 @@ import { sampleAutomation } from "./sample";
 import { buildAutomationDiff } from "./automationDiff";
 import { createAutomationSnapshot, parseAutomationSnapshot, serializeAutomationSnapshot, snapshotFilename } from "./snapshot";
 import { lintAutomation } from "./lint";
+import { LANGUAGE_CODES, LANGUAGE_LABELS, normalizeLanguage, translate, type Language } from "./i18n";
 import {
   sanitizeAutomationReferences,
   sanitizeCompanionTrace,
@@ -44,33 +45,33 @@ interface CompanionEntityMetadata {
 
 
 
-function formatTraceResult(value: unknown): string | null {
+function formatTraceResult(value: unknown, language: Language): string | null {
   if (value == null) return null;
   if (typeof value !== "object") return String(value);
 
   const record = value as Record<string, unknown>;
-  if (typeof record.result === "boolean") return record.result ? "condition: true" : "condition: false";
+  if (typeof record.result === "boolean") return translate(record.result ? "condition: true" : "condition: false", language);
   if (record.choice != null) return `choice: ${String(record.choice)}`;
-  if (record.timeout === true) return "timeout";
+  if (record.timeout === true) return translate("timeout", language);
   if (record.stop != null) return `stop: ${String(record.stop)}`;
   if (record.delay != null) return `delay: ${String(record.delay)}`;
   if (record.wait && typeof record.wait === "object") {
     const wait = record.wait as Record<string, unknown>;
-    if (typeof wait.completed === "boolean") return wait.completed ? "wait completed" : "wait incomplete";
+    if (typeof wait.completed === "boolean") return translate(wait.completed ? "wait completed" : "wait incomplete", language);
   }
 
   try {
     const serialized = JSON.stringify(value);
     return serialized.length > 180 ? `${serialized.slice(0, 177)}…` : serialized;
   } catch {
-    return "runtime result";
+    return translate("runtime result", language);
   }
 }
 
-function formatTraceTime(value?: string | null): string {
-  if (!value) return "unknown time";
+function formatTraceTime(value: string | null | undefined, language: Language): string {
+  if (!value) return translate("unknown time", language);
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(language);
 }
 
 function EntityIcon({
@@ -129,6 +130,9 @@ export function App() {
   const [yaml, setYaml] = useState(sampleAutomation);
   const [baselineYaml, setBaselineYaml] = useState(sampleAutomation);
   const [tab, setTab] = useState<Tab>("summary");
+  const [language, setLanguage] = useState<Language>(() =>
+    normalizeLanguage(new URLSearchParams(window.location.search).get("lang") || navigator.language));
+  const t = (key: string) => translate(key, language);
   const [selectedPath, setSelectedPath] = useState<ExecutionPath | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [presentation, setPresentation] = useState(false);
@@ -179,11 +183,17 @@ export function App() {
         traceUnavailableReason?: string | null;
         homeAssistantUnavailable?: boolean;
         homeAssistantVersion?: string | null;
+        language?: string | null;
       };
+      if (message.type === "ha-lens:locale" && message.nonce === channelNonce) {
+        if (message.language) setLanguage(normalizeLanguage(message.language));
+        return;
+      }
       if (message.type !== "ha-lens:automation" || message.nonce !== channelNonce || !message.config || typeof message.config !== "object" || Array.isArray(message.config)) return;
 
       const source = serializeAutomationYaml(message.config);
       if (source.length > 2_000_000) return;
+      if (message.language) setLanguage(normalizeLanguage(message.language));
       setYaml(source);
       setBaselineYaml(source);
       const metadata = message.entityMetadata && typeof message.entityMetadata === "object"
@@ -324,7 +334,7 @@ export function App() {
 
     for (const [nodeId, count] of traceCoverage.repeatIterationCounts) {
       badges.set(nodeId, {
-        label: `${count} ${count === 1 ? "iteration" : "iterations"}`,
+        label: `${count} ${t(count === 1 ? "iteration" : "iterations")}`,
         tone: count > 0 ? "good" : "neutral",
       });
     }
@@ -333,13 +343,13 @@ export function App() {
       const observed = coverage.observedBranchIndexes.size;
       const total = coverage.totalBranches;
       badges.set(nodeId, {
-        label: `${observed}/${total} branches`,
+        label: `${observed}/${total} ${t("branches")}`,
         tone: total > 0 && observed === total ? "good" : "partial",
       });
     }
 
     return badges;
-  }, [showTrace, traceCoverage]);
+  }, [showTrace, traceCoverage, language]);
 
   const graphNodeById = useMemo(
     () => result.ok ? new Map(result.graph.nodes.map((node) => [node.id, node])) : new Map(),
@@ -352,6 +362,7 @@ export function App() {
   );
 
   const inspectorTrace = trace ?? triggerDiagnostic;
+  const tabLabel: Record<Tab, string> = { summary: "Summary", paths: "Paths", entities: "Entities", diff: "Diff", trace: "Trace", insights: "Insights", lint: "Lint", explain: "Explain" };
   const inspectorTraceIsDiagnostic = !trace && Boolean(triggerDiagnostic);
 
   const tabs = useMemo<Tab[]>(
@@ -536,13 +547,13 @@ export function App() {
         <header className="presentation__header">
           <div><span className="brand-mark">◉</span> HA Lens <strong>{result.automation.alias}</strong></div>
           <div className="topbar__actions">
-            <button className="ghost" onClick={() => void copyMermaid()}>{copyStatus === "copied" ? "Mermaid copied ✓" : "Copy Mermaid"}</button>
-            <button className="ghost" disabled={!!exporting} onClick={() => void handleExport("svg")}>{exporting === "svg" ? "Exporting…" : "Export SVG"}</button>
-            <button className="ghost" disabled={!!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
-            <button onClick={() => setPresentation(false)}>Exit presentation</button>
+            <button className="ghost" onClick={() => void copyMermaid()}>{t(copyStatus === "copied" ? "Mermaid copied ✓" : "Copy Mermaid")}</button>
+            <button className="ghost" disabled={!!exporting} onClick={() => void handleExport("svg")}>{t(exporting === "svg" ? "Exporting…" : "Export SVG")}</button>
+            <button className="ghost" disabled={!!exporting} onClick={() => void handleExport("png")}>{t(exporting === "png" ? "Exporting…" : "Export PNG")}</button>
+            <button onClick={() => setPresentation(false)}>{t("Exit presentation")}</button>
           </div>
         </header>
-        <div className="presentation__graph"><AutomationGraph graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} traceNotTakenEdgeIds={traceNotTakenEdgeIds} traceNodeBadges={traceNodeBadges} nodeEntityIcons={graphNodeEntityIcons} traceCoverageActive={Boolean(trace && showTrace)} focusNodeIds={entityFocusNodeIds} fitMode={graphFitMode} /></div>
+        <div className="presentation__graph"><AutomationGraph language={language} graph={result.graph} highlightedNodeIds={highlightedNodeIds} traceNodeIds={tracedNodeIds} traceEdgeIds={tracedEdgeIds} traceNotTakenEdgeIds={traceNotTakenEdgeIds} traceNodeBadges={traceNodeBadges} nodeEntityIcons={graphNodeEntityIcons} traceCoverageActive={Boolean(trace && showTrace)} focusNodeIds={entityFocusNodeIds} fitMode={graphFitMode} /></div>
       </main>
     );
   }
@@ -552,23 +563,26 @@ export function App() {
       {!embedded && <header className="topbar">
         <div>
           <div className="brand"><span className="brand-mark">◉</span> HA Lens <span className="badge">v0.1</span></div>
-          <div className="tagline">See what your Home Assistant automation can do.</div>
+          <div className="tagline">{t("See what your Home Assistant automation can do.")}</div>
         </div>
         <div className="topbar__actions">
-          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setBaselineYaml(sampleAutomation); setEntityMetadata({}); setTargetMetadata({}); setAutomationReferences({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); setLintEnabled(false); }}>Load example</button>
-          <button className="ghost" disabled={!result.ok} onClick={() => void copyMermaid()}>{copyStatus === "copied" ? "Mermaid copied ✓" : copyStatus === "failed" ? "Copy failed" : "Copy Mermaid"}</button>
-          <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("svg")}>{exporting === "svg" ? "Exporting…" : "Export SVG"}</button>
-          <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("png")}>{exporting === "png" ? "Exporting…" : "Export PNG"}</button>
-          <button disabled={!result.ok} onClick={() => setPresentation(true)}>Presentation mode</button>
+          <select aria-label="Language" value={language} onChange={(event) => setLanguage(normalizeLanguage(event.target.value))} style={{maxWidth: 135, flex: "0 0 auto"}}>
+            {LANGUAGE_CODES.map((code) => <option key={code} value={code}>{LANGUAGE_LABELS[code]}</option>)}
+          </select>
+          <button className="ghost" onClick={() => { setYaml(sampleAutomation); setBaselineYaml(sampleAutomation); setEntityMetadata({}); setTargetMetadata({}); setAutomationReferences({}); setTrace(null); setTriggerDiagnostic(null); setHomeAssistantUnavailable(false); setShowTrace(false); setSelectedTraceNodeId(null); setSelectedDiffNodeId(null); setLintEnabled(false); }}>{t("Load example")}</button>
+          <button className="ghost" disabled={!result.ok} onClick={() => void copyMermaid()}>{t(copyStatus === "copied" ? "Mermaid copied ✓" : copyStatus === "failed" ? "Copy failed" : "Copy Mermaid")}</button>
+          <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("svg")}>{t(exporting === "svg" ? "Exporting…" : "Export SVG")}</button>
+          <button className="ghost" disabled={!result.ok || !!exporting} onClick={() => void handleExport("png")}>{t(exporting === "png" ? "Exporting…" : "Export PNG")}</button>
+          <button disabled={!result.ok} onClick={() => setPresentation(true)}>{t("Presentation mode")}</button>
         </div>
       </header>}
 
       <section className={`workspace ${yamlCollapsed ? "workspace--yaml-collapsed" : ""}`}>
         <aside className="yaml-panel panel">
           <div className="panel__header">
-            <strong>Automation YAML</strong>
+            <strong>{t("Automation YAML")}</strong>
             <div className="yaml-panel__tools">
-              <span>{snapshotStatus === "saved" ? "snapshot saved ✓" : snapshotStatus === "loaded" ? "snapshot loaded ✓" : snapshotStatus === "error" ? "snapshot failed" : "local only"}</span>
+              <span>{t(snapshotStatus === "saved" ? "snapshot saved ✓" : snapshotStatus === "loaded" ? "snapshot loaded ✓" : snapshotStatus === "error" ? "snapshot failed" : "local only")}</span>
               <input
                 ref={snapshotInputRef}
                 className="snapshot-input"
@@ -576,14 +590,14 @@ export function App() {
                 accept=".json,.ha-lens.json,application/json"
                 onChange={(event) => void importSnapshot(event.target.files?.[0])}
               />
-              <button className="ghost snapshot-tool" disabled={!result.ok} onClick={exportSnapshot} title="Save only this automation YAML as a local HA Lens snapshot">Save snapshot</button>
-              <button className="ghost snapshot-tool" onClick={() => snapshotInputRef.current?.click()} title="Open a local HA Lens snapshot; no data is uploaded">Open snapshot</button>
+              <button className="ghost snapshot-tool" disabled={!result.ok} onClick={exportSnapshot} title={t("Save only this automation YAML as a local HA Lens snapshot")}>{t("Save snapshot")}</button>
+              <button className="ghost snapshot-tool" onClick={() => snapshotInputRef.current?.click()} title={t("Open a local HA Lens snapshot; no data is uploaded")}>{t("Open snapshot")}</button>
               <button
                 className="ghost yaml-toggle"
                 onClick={() => setYamlCollapsed(true)}
-                title="Hide automation YAML and give the graph more space"
+                title={t("Hide automation YAML and give the graph more space")}
               >
-                Hide YAML
+                {t("Hide YAML")}
               </button>
             </div>
           </div>
@@ -592,20 +606,20 @@ export function App() {
 
         <section className="graph-panel panel">
           <div className="panel__header">
-            <strong>{result.ok ? result.automation.alias : "Automation map"}</strong>
+            <strong>{result.ok ? result.automation.alias : t("Automation map")}</strong>
             <div className="panel__header-actions">
               <div className="graph-fit-controls" aria-label="Graph fit mode">
                 <button
                   className={`ghost fit-toggle ${graphFitMode === "all" ? "is-active" : ""}`}
                   onClick={() => setGraphFitMode("all")}
-                  title="Fit the complete graph into the available canvas"
+                  title={t("Fit the complete graph into the available canvas")}
                 >
                   Fit all
                 </button>
                 <button
                   className={`ghost fit-toggle ${graphFitMode === "width" ? "is-active" : ""}`}
                   onClick={() => setGraphFitMode("width")}
-                  title="Fit graph to the available width; pan vertically for tall automations"
+                  title={t("Fit graph to the available width; pan vertically for tall automations")}
                 >
                   Fit width
                 </button>
@@ -614,9 +628,9 @@ export function App() {
                 <button
                   className="ghost yaml-toggle"
                   onClick={() => setYamlCollapsed(false)}
-                  title="Show automation YAML"
+                  title={t("Show automation YAML")}
                 >
-                  Show YAML
+                  {t("Show YAML")}
                 </button>
               )}
               {trace && result.ok && (
@@ -627,7 +641,7 @@ export function App() {
                       setSelectedTraceNodeId(null);
                       setShowTrace(false);
                     }}
-                    title="Show the complete static automation structure"
+                    title={t("Show the complete static automation structure")}
                   >
                     Structure
                   </button>
@@ -637,13 +651,13 @@ export function App() {
                       setSelectedTraceNodeId(null);
                       setShowTrace(true);
                     }}
-                    title="Compare the latest Home Assistant run with the static structure"
+                    title={t("Compare the latest Home Assistant run with the static structure")}
                   >
                     Last run
                   </button>
                 </div>
               )}
-              <span>{result.ok ? `${result.paths.length} paths` : "Waiting for valid YAML"}</span>
+              <span>{result.ok ? `${result.paths.length} ${t("paths")}` : t("Waiting for valid YAML")}</span>
             </div>
           </div>
           <div className={`graph-area ${entityFocus ? "has-entity-focus" : ""}`}>
@@ -651,33 +665,34 @@ export function App() {
               <div className="entity-focus-banner">
                 <div className="entity-focus-banner__icon">◎</div>
                 <div className="entity-focus-banner__body">
-                  <strong>Entity focus active · {entityFocus.name}</strong>
+                  <strong>{t("Entity focus active")} · {entityFocus.name}</strong>
                   <span>
-                    {entityFocus.nodeCount} matching graph node{entityFocus.nodeCount === 1 ? "" : "s"} highlighted
-                    {entityFocus.referenceCount !== entityFocus.nodeCount ? ` · ${entityFocus.referenceCount} specific references` : ""}.
+                    {entityFocus.nodeCount} {t("matching graph nodes highlighted")}
+                    {entityFocus.referenceCount !== entityFocus.nodeCount ? ` · ${entityFocus.referenceCount} {t("specific references")}` : ""}.
                     Unrelated nodes are dimmed.
                   </span>
                   <code>{entityFocus.entityId}</code>
                 </div>
-                <button className="entity-focus-banner__clear" onClick={() => setSelectedEntity(null)}>Clear focus</button>
+                <button className="entity-focus-banner__clear" onClick={() => setSelectedEntity(null)}>{t("Clear focus")}</button>
               </div>
             )}
             <div className="graph-canvas">
               {diffActive && automationDiff && (
                 <div className="diff-legend" aria-label="Automation diff legend">
-                  <span><i className="diff-dot is-added" />Added</span>
-                  <span><i className="diff-dot is-changed" />Changed</span>
-                  <span><i className="diff-dot is-removed" />Removed</span>
+                  <span><i className="diff-dot is-added" />{t("Added")}</span>
+                  <span><i className="diff-dot is-changed" />{t("Changed")}</span>
+                  <span><i className="diff-dot is-removed" />{t("Removed")}</span>
                 </div>
               )}
               {trace && showTrace && result.ok && !diffActive && (
                 <div className="run-coverage-legend" aria-label="Last run coverage legend">
-                  <span><i className="run-coverage-dot is-executed" />Executed</span>
-                  <span><i className="run-coverage-line is-not-taken" />Branch not taken</span>
-                  <span><i className="run-coverage-dot is-not-reached" />Not reached</span>
+                  <span><i className="run-coverage-dot is-executed" />{t("Executed")}</span>
+                  <span><i className="run-coverage-line is-not-taken" />{t("Branch not taken")}</span>
+                  <span><i className="run-coverage-dot is-not-reached" />{t("Not reached")}</span>
                 </div>
               )}
               {result.ok ? <AutomationGraph
+                language={language}
                 graph={diffActive && automationDiff ? automationDiff.graph : result.graph}
                 highlightedNodeIds={highlightedNodeIds}
                 traceNodeIds={tracedNodeIds}
@@ -692,7 +707,7 @@ export function App() {
                 focusNodeIds={entityFocusNodeIds}
                 refitKey={yamlCollapsed || diffActive}
                 fitMode={graphFitMode}
-              /> : <div className="error-state"><strong>YAML could not be parsed</strong><p>{result.error}</p></div>}
+              /> : <div className="error-state"><strong>{t("YAML could not be parsed")}</strong><p>{result.error}</p></div>}
             </div>
           </div>
         </section>
@@ -714,12 +729,12 @@ export function App() {
                   setTab(item);
                 }}
               >
-                {item}
+                {t(tabLabel[item])}
               </button>
             ))}
           </nav>
           <div className="inspector__body">
-            {!result.ok ? <p>Fix the YAML to unlock analysis.</p> : tab === "summary" ? (
+            {!result.ok ? <p>{t("Fix the YAML to unlock analysis.")}</p> : tab === "summary" ? (
               <>
                 <h2>{result.automation.alias}</h2>
                 {result.automation.description && <p className="muted">{result.automation.description}</p>}
@@ -727,25 +742,25 @@ export function App() {
                   <div className="ha-version-note">Home Assistant {homeAssistantVersion}</div>
                 )}
                 {homeAssistantUnavailable && (
-                  <div className="notice notice--warning">Home Assistant currently marks this automation as unavailable. HA Lens can still inspect the raw configuration, but the automation is not runnable in Home Assistant until its validation issue is resolved.</div>
+                  <div className="notice notice--warning">{t("Home Assistant currently marks this automation as unavailable. HA Lens can still inspect the raw configuration, but the automation is not runnable in Home Assistant until its validation issue is resolved.")}</div>
                 )}
                 {traceUnavailableReason === "automation_without_id" && !trace && !triggerDiagnostic && (
                   <div className="notice">
-                    Home Assistant does not store automation traces when this automation has no configuration ID. Since 2026.10.1 this is intentional Core behavior, so Last run coverage is unavailable until an ID is present.
+                    {t("Home Assistant does not store automation traces when this automation has no configuration ID. Since 2026.10.1 this is intentional Core behavior, so Last run coverage is unavailable until an ID is present.")}
                   </div>
                 )}
                 {traceUnavailableReason === "trace_api_error" && !trace && !triggerDiagnostic && (
-                  <div className="notice notice--warning">Home Assistant's trace API could not be read for this automation. Static analysis remains available.</div>
+                  <div className="notice notice--warning">{t("Home Assistant's trace API could not be read for this automation. Static analysis remains available.")}</div>
                 )}
                 {trace && (
                   <div className="trace-card">
                     <div>
-                      <strong>Last Home Assistant execution</strong>
-                      <span>{formatTraceTime(trace.startedAt)}</span>
+                      <strong>{t("Last Home Assistant execution")}</strong>
+                      <span>{formatTraceTime(trace.startedAt, language)}</span>
                     </div>
                     <div className="trace-card__meta">
-                      <span>{trace.scriptExecution || trace.state || "recorded"}</span>
-                      <span>{trace.paths.length} traced step{trace.paths.length === 1 ? "" : "s"}</span>
+                      <span>{trace.scriptExecution || trace.state || t("recorded")}</span>
+                      <span>{trace.paths.length} {t("traced steps")}</span>
                     </div>
                     {trace.error && <div className="trace-card__error">{trace.error}</div>}
                   </div>
@@ -753,31 +768,31 @@ export function App() {
                 {triggerDiagnostic && (
                   <div className="trace-card trace-card--diagnostic">
                     <div>
-                      <strong>Latest trigger diagnostic</strong>
-                      <span>{formatTraceTime(triggerDiagnostic.startedAt)}</span>
+                      <strong>{t("Latest trigger diagnostic")}</strong>
+                      <span>{formatTraceTime(triggerDiagnostic.startedAt, language)}</span>
                     </div>
                     <div className="trace-card__meta">
-                      <span>not triggered</span>
-                      <span>{triggerDiagnostic.lastStep || "trigger evaluated"}</span>
+                      <span>{t("not triggered")}</span>
+                      <span>{triggerDiagnostic.lastStep || t("trigger evaluated")}</span>
                     </div>
-                    <p className="trace-card__diagnostic-copy">Home Assistant evaluated a trigger but did not start the automation. This diagnostic is intentionally excluded from Last run coverage.</p>
+                    <p className="trace-card__diagnostic-copy">{t("Home Assistant evaluated a trigger but did not start the automation. This diagnostic is intentionally excluded from Last run coverage.")}</p>
                     {triggerDiagnostic.error && <div className="trace-card__error">{triggerDiagnostic.error}</div>}
                   </div>
                 )}
                 <div className="stat-grid">
-                  {Object.entries(result.analysis.stats).map(([key, value]) => <div className="stat" key={key}><strong>{value}</strong><span>{key.replace(/([A-Z])/g, " $1")}</span></div>)}
+                  {Object.entries(result.analysis.stats).map(([key, value]) => <div className="stat" key={key}><strong>{value}</strong><span>{t(key.replace(/([A-Z])/g, " $1").toLowerCase())}</span></div>)}
                 </div>
                 {result.warnings.map((warning) => <div className="notice" key={warning}>{warning}</div>)}
-                <p className="privacy">Analysis runs in your browser. HA Lens does not execute this automation.</p>
+                <p className="privacy">{t("Analysis runs in your browser. HA Lens does not execute this automation.")}</p>
               </>
             ) : tab === "paths" ? (
               <div className="path-list">
-                <div className="section-intro">Select a path to highlight it in the map.</div>
+                <div className="section-intro">{t("Select a path to highlight it in the map.")}</div>
                 {result.paths.map((path) => (
                   <button key={path.id} className={`path-card ${selectedPath?.id === path.id ? "is-active" : ""}`} onClick={() => { setSelectedEntity(null); setSelectedPath(selectedPath?.id === path.id ? null : path); }}>
                     <span className={`outcome outcome--${path.outcome}`}>{path.outcome}</span>
                     <strong>{path.title}</strong>
-                    <span>{path.steps.length} steps</span>
+                    <span>{path.steps.length} {t("steps")}</span>
                   </button>
                 ))}
                 {selectedPath && <ol className="path-steps">{selectedPath.steps.map((step, index) => <li key={`${step.nodeId}-${index}`}><strong>{step.label}</strong>{step.detail && <span>{step.detail}</span>}</li>)}</ol>}
@@ -785,7 +800,7 @@ export function App() {
             ) : tab === "entities" ? (
               <>
                 <div className="entity-section-heading">
-                  <h3>Entities</h3>
+                  <h3>{t("Entities")}</h3>
                   <span>{sortedEntities.length}</span>
                 </div>
                 <div className="entity-list">
@@ -820,58 +835,58 @@ export function App() {
                           <code>{metadata?.entityId || entity}</code>
                           {(focused || metadata?.area || metadata?.device) && (
                             <span className="entity-card__meta">
-                              {focused && <small className="entity-card__focused-badge">Focused</small>}
-                              {metadata?.area && <small><b>Area</b>{metadata.area}</small>}
-                              {metadata?.device && <small><b>Device</b>{metadata.device}</small>}
+                              {focused && <small className="entity-card__focused-badge">{t("Focused")}</small>}
+                              {metadata?.area && <small><b>{t("Area")}</b>{metadata.area}</small>}
+                              {metadata?.device && <small><b>{t("Device")}</b>{metadata.device}</small>}
                             </span>
                           )}
                           {focused && usageDetails.length > 0 && (
                             <span className="entity-card__contexts">
-                              <b>Used at</b>
+                              <b>{t("Used at")}</b>
                               {usageDetails.map((detail, index) => (
                                 <small key={`${detail.nodeId}-${detail.context}-${index}`}>{detail.context}</small>
                               ))}
                             </span>
                           )}
                         </span>
-                        <span className="entity-card__usage" aria-label={`${usageCount} graph node${usageCount === 1 ? "" : "s"}, ${referenceCount} reference${referenceCount === 1 ? "" : "s"}`}>
+                        <span className="entity-card__usage" aria-label={`${usageCount} ${t(usageCount === 1 ? "graph node" : "graph nodes")}, ${referenceCount} ${t(referenceCount === 1 ? "reference" : "references")}`}>
                           <span className="entity-card__usage-metric">
                             <strong>{usageCount}</strong>
-                            <small>{usageCount === 1 ? "graph node" : "graph nodes"}</small>
+                            <small>{t(usageCount === 1 ? "graph node" : "graph nodes")}</small>
                           </span>
                           <span className="entity-card__usage-metric">
                             <strong>{referenceCount}</strong>
-                            <small>{referenceCount === 1 ? "reference" : "references"}</small>
+                            <small>{t(referenceCount === 1 ? "reference" : "references")}</small>
                           </span>
                         </span>
                       </button>
                     );
-                  }) : <div className="empty-state">No static entity IDs found.</div>}
+                  }) : <div className="empty-state">{t("No static entity IDs found.")}</div>}
                 </div>
                 <div className="entity-section-heading entity-section-heading--actions">
-                  <h3>Actions</h3>
+                  <h3>{t("Actions")}</h3>
                   <span>{result.analysis.actions.length}</span>
                 </div>
                 <div className="action-list">
                   {result.analysis.actions.length
                     ? result.analysis.actions.map((action) => <code key={action}>{action}</code>)
-                    : <div className="empty-state">No service actions found.</div>}
+                    : <div className="empty-state">{t("No service actions found.")}</div>}
                 </div>
                 <div className="entity-section-heading entity-section-heading--actions">
-                  <h3>Targets</h3>
+                  <h3>{t("Targets")}</h3>
                   <span>{unifiedTargets.length}</span>
                 </div>
                 <div className="target-list">
                   {unifiedTargets.length ? unifiedTargets.map((target) => {
                     const targetName = targetMetadata[target.kind]?.[target.id]?.name || target.id;
                     const status = target.staticResolved && target.homeAssistantResolved
-                      ? "Static + HA"
+                      ? t("Static + HA")
                       : target.homeAssistantResolved
-                        ? "HA only"
-                        : "Static only";
+                        ? t("HA only")
+                        : t("Static only");
                     return (
-                      <div className="target-card" key={`${target.kind}:${target.id}`}>
-                        <span className={`target-card__kind target-card__kind--${target.kind}`}>{target.kind}</span>
+                      <div className="target-card" key={`${t(target.kind)}:${target.id}`}>
+                        <span className={`target-card__kind target-card__kind--${t(target.kind)}`}>{t(target.kind)}</span>
                         <span className="target-card__identity">
                           <strong>{targetName}</strong>
                           {targetName !== target.id && <code>{target.id}</code>}
@@ -888,15 +903,15 @@ export function App() {
                         </small>
                       </div>
                     );
-                  }) : <div className="empty-state">No entity/device/area/floor/label targets found.</div>}
+                  }) : <div className="empty-state">{t("No entity/device/area/floor/label targets found.")}</div>}
                 </div>
               </>
             ) : tab === "diff" ? (
               <div className="diff-inspector">
                 <div className="diff-header">
                   <div>
-                    <h3>Automation Diff</h3>
-                    <p>Baseline: {baselineResult.ok ? baselineResult.automation.alias : "invalid baseline"}</p>
+                    <h3>{t("Automation Diff")}</h3>
+                    <p>Baseline: {baselineResult.ok ? baselineResult.automation.alias : t("invalid baseline")}</p>
                   </div>
                   <button
                     className="ghost diff-baseline-button"
@@ -905,23 +920,23 @@ export function App() {
                       setBaselineYaml(yaml);
                       setSelectedDiffNodeId(null);
                     }}
-                    title="Use the current local YAML as the new comparison baseline"
+                    title={t("Use the current local YAML as the new comparison baseline")}
                   >
                     Set current as baseline
                   </button>
                 </div>
                 <div className="section-intro">
-                  The loaded Home Assistant version is captured automatically as the baseline. Edit or paste YAML locally to compare it without writing anything back.
+                  {t("The loaded Home Assistant version is captured automatically as the baseline. Edit or paste YAML locally to compare it without writing anything back.")}
                 </div>
                 {!baselineResult.ok ? (
                   <div className="notice">Baseline YAML could not be parsed: {baselineResult.error}</div>
                 ) : automationDiff ? (
                   <>
                     <div className="diff-stat-grid">
-                      <div className="diff-stat diff-stat--added"><strong>{automationDiff.stats.added}</strong><span>Added</span></div>
-                      <div className="diff-stat diff-stat--changed"><strong>{automationDiff.stats.changed}</strong><span>Changed</span></div>
-                      <div className="diff-stat diff-stat--removed"><strong>{automationDiff.stats.removed}</strong><span>Removed</span></div>
-                      <div className="diff-stat"><strong>{automationDiff.stats.unchanged}</strong><span>Unchanged</span></div>
+                      <div className="diff-stat diff-stat--added"><strong>{automationDiff.stats.added}</strong><span>{t("Added")}</span></div>
+                      <div className="diff-stat diff-stat--changed"><strong>{automationDiff.stats.changed}</strong><span>{t("Changed")}</span></div>
+                      <div className="diff-stat diff-stat--removed"><strong>{automationDiff.stats.removed}</strong><span>{t("Removed")}</span></div>
+                      <div className="diff-stat"><strong>{automationDiff.stats.unchanged}</strong><span>{t("Unchanged")}</span></div>
                     </div>
                     {automationDiff.hasChanges ? (
                       <div className="diff-change-list">
@@ -930,17 +945,17 @@ export function App() {
                           return (
                             <button
                               key={change.key}
-                              className={`diff-change diff-change--${change.status} ${selected ? "is-active" : ""}`}
+                              className={`diff-change diff-change--${t(change.status[0].toUpperCase() + change.status.slice(1))} ${selected ? "is-active" : ""}`}
                               disabled={!change.graphNodeId}
                               onClick={() => {
                                 if (!change.graphNodeId) return;
                                 setSelectedDiffNodeId(selected ? null : change.graphNodeId);
                               }}
                             >
-                              <span className={`diff-change__status diff-change__status--${change.status}`}>{change.status}</span>
+                              <span className={`diff-change__status diff-change__status--${t(change.status[0].toUpperCase() + change.status.slice(1))}`}>{t(change.status[0].toUpperCase() + change.status.slice(1))}</span>
                               <span className="diff-change__body">
                                 <strong>{change.label}</strong>
-                                <small>{change.kind}{change.detail ? ` · ${change.detail}` : ""}</small>
+                                <small>{t(change.kind)}{change.detail ? ` · ${change.detail}` : ""}</small>
                                 {change.beforeLabel && change.afterLabel && change.beforeLabel !== change.afterLabel && (
                                   <span className="diff-change__transition">
                                     <span>{change.beforeLabel}</span>
@@ -955,11 +970,11 @@ export function App() {
                       </div>
                     ) : (
                       <div className="diff-empty">
-                        <strong>No changes</strong>
-                        <span>The current YAML matches the captured baseline.</span>
+                        <strong>{t("No changes")}</strong>
+                        <span>{t("The current YAML matches the captured baseline.")}</span>
                       </div>
                     )}
-                    <p className="privacy">Diffing happens entirely in your browser. Removed baseline nodes are shown only in the Diff graph and are never written to Home Assistant.</p>
+                    <p className="privacy">{t("Diffing happens entirely in your browser. Removed baseline nodes are shown only in the Diff graph and are never written to Home Assistant.")}</p>
                   </>
                 ) : null}
               </div>
@@ -967,18 +982,18 @@ export function App() {
               <div className="trace-inspector">
                 {inspectorTraceIsDiagnostic && (
                   <div className="notice notice--warning">
-                    <strong>Trigger diagnostic — automation did not run.</strong> Home Assistant recorded a trigger evaluation, but no automation execution started. These events are never used for Last run coverage.
+                    <strong>{t("Trigger diagnostic — automation did not run.")}</strong> {t("Home Assistant recorded a trigger evaluation, but no automation execution started. These events are never used for Last run coverage.")}
                   </div>
                 )}
                 <div className="trace-overview">
-                  <div><span>Started</span><strong>{formatTraceTime(inspectorTrace.startedAt)}</strong></div>
-                  <div><span>Finished</span><strong>{inspectorTrace.finishedAt ? formatTraceTime(inspectorTrace.finishedAt) : "still running / unknown"}</strong></div>
-                  <div><span>Result</span><strong>{inspectorTrace.scriptExecution || inspectorTrace.state || "recorded"}</strong></div>
-                  <div><span>Last step</span><strong>{inspectorTrace.lastStep || "unknown"}</strong></div>
+                  <div><span>{t("Started")}</span><strong>{formatTraceTime(inspectorTrace.startedAt, language)}</strong></div>
+                  <div><span>{t("Finished")}</span><strong>{inspectorTrace.finishedAt ? formatTraceTime(inspectorTrace.finishedAt, language) : t("still running / unknown")}</strong></div>
+                  <div><span>{t("Result")}</span><strong>{inspectorTrace.scriptExecution || inspectorTrace.state || t("recorded")}</strong></div>
+                  <div><span>{t("Last step")}</span><strong>{inspectorTrace.lastStep || t("unknown")}</strong></div>
                 </div>
                 {inspectorTrace.error && <div className="trace-card__error">{inspectorTrace.error}</div>}
                 <div className="trace-toolbar">
-                  <span>{inspectorTrace.steps?.length ?? inspectorTrace.paths.length} runtime event{(inspectorTrace.steps?.length ?? inspectorTrace.paths.length) === 1 ? "" : "s"}</span>
+                  <span>{inspectorTrace.steps?.length ?? inspectorTrace.paths.length} {t("runtime events")}</span>
                   {trace && (
                     <button
                       className="ghost trace-clear"
@@ -1000,11 +1015,11 @@ export function App() {
                     const node = nodeId ? graphNodeById.get(nodeId) : undefined;
                     const semanticId = tracePathToSemanticId(step.path, traceSemanticLabels.keys());
                     const semanticLabel = semanticId ? traceSemanticLabels.get(semanticId) : undefined;
-                    const resultText = formatTraceResult(step.result);
+                    const resultText = formatTraceResult(step.result, language);
                     const traceContext = buildTraceBreadcrumb(result.automation, step.path, step.repeatIndex);
                     const stepDetail = [
                       step.error || resultText,
-                      step.repeatIndex ? `iteration ${step.repeatIndex}` : null,
+                      step.repeatIndex ? `${t("iteration")} ${step.repeatIndex}` : null,
                     ].filter(Boolean).join(" · ");
                     const selected = Boolean(nodeId && selectedTraceNodeId === nodeId);
                     return (
@@ -1052,54 +1067,54 @@ export function App() {
                             </span>
                           )}
                         </span>
-                        <span className="trace-step__time">{step.timestamp ? new Date(step.timestamp).toLocaleTimeString() : nodeId ? "mapped" : "unmapped"}</span>
+                        <span className="trace-step__time">{step.timestamp ? new Date(step.timestamp).toLocaleTimeString(language) : t(nodeId ? "mapped" : "unmapped")}</span>
                       </button>
                     );
                   })}
                 </div>
-                <p className="privacy">Trace data comes from Home Assistant's local trace API. Trigger diagnostics are kept separate from actual execution coverage. HA Lens does not execute the automation.</p>
+                <p className="privacy">{t("Trace data comes from Home Assistant's local trace API. Trigger diagnostics are kept separate from actual execution coverage. HA Lens does not execute the automation.")}</p>
               </div>
             ) : tab === "insights" ? (
               <>
-                <div className="section-intro">These are structural observations, not validation errors.</div>
-                {result.analysis.insights.length ? result.analysis.insights.map((insight, index) => <div className={`insight insight--${insight.level}`} key={`${insight.nodeId}-${index}`}>{insight.message}</div>) : <div className="empty-state">No structural insights for this automation.</div>}
+                <div className="section-intro">{t("These are structural observations, not validation errors.")}</div>
+                {result.analysis.insights.length ? result.analysis.insights.map((insight, index) => <div className={`insight insight--${insight.level}`} key={`${insight.nodeId}-${index}`}>{insight.message}</div>) : <div className="empty-state">{t("No structural insights for this automation.")}</div>}
               </>
             ) : tab === "lint" ? (
               <div className="lint-panel">
-                <div className="section-intro">Optional static checks. Lint findings are advisory HA Lens observations, not Home Assistant validation errors.</div>
+                <div className="section-intro">{t("Optional static checks. Lint findings are advisory HA Lens observations, not Home Assistant validation errors.")}</div>
                 {!lintEnabled ? (
                   <div className="lint-opt-in">
-                    <strong>Lint checks are off</strong>
-                    <span>Run conservative structural checks only when you want them.</span>
-                    <button onClick={() => setLintEnabled(true)}>Run lint checks</button>
+                    <strong>{t("Lint checks are off")}</strong>
+                    <span>{t("Run conservative structural checks only when you want them.")}</span>
+                    <button onClick={() => setLintEnabled(true)}>{t("Run lint checks")}</button>
                   </div>
                 ) : (
                   <>
                     <div className="lint-toolbar">
-                      <span>{lintIssues.length} finding{lintIssues.length === 1 ? "" : "s"}</span>
-                      <button className="ghost" onClick={() => setLintEnabled(false)}>Clear lint results</button>
+                      <span>{lintIssues.length} {t("findings")}</span>
+                      <button className="ghost" onClick={() => setLintEnabled(false)}>{t("Clear lint results")}</button>
                     </div>
                     {lintIssues.length ? (
                       <div className="lint-list">
                         {lintIssues.map((issue, index) => (
-                          <div className={`lint-issue lint-issue--${issue.severity}`} key={`${issue.ruleId}-${issue.nodeId || index}`}>
+                          <div className={`lint-issue lint-issue--${t(issue.severity)}`} key={`${issue.ruleId}-${issue.nodeId || index}`}>
                             <span className="lint-issue__id">{issue.ruleId}</span>
                             <span className="lint-issue__body">
                               <strong>{issue.title}</strong>
                               <small>{issue.detail}</small>
                             </span>
-                            <span className="lint-issue__severity">{issue.severity}</span>
+                            <span className="lint-issue__severity">{t(issue.severity)}</span>
                           </div>
                         ))}
                       </div>
-                    ) : <div className="diff-empty"><strong>No lint findings</strong><span>None of the enabled HA Lens advisory rules matched this automation.</span></div>}
-                    <p className="privacy">Lint runs locally and does not replace Home Assistant configuration validation.</p>
+                    ) : <div className="diff-empty"><strong>{t("No lint findings")}</strong><span>{t("None of the enabled HA Lens advisory rules matched this automation.")}</span></div>}
+                    <p className="privacy">{t("Lint runs locally and does not replace Home Assistant configuration validation.")}</p>
                   </>
                 )}
               </div>
             ) : (
               <>
-                <div className="section-intro">A deterministic explanation generated from the parsed automation structure. No AI or cloud processing is used.</div>
+                <div className="section-intro">{t("A deterministic explanation generated from the parsed automation structure. No AI or cloud processing is used.")}</div>
                 <div className="explanation-list">
                   {result.explanation.map((line, index) => <p key={index}><span>{index + 1}</span>{line}</p>)}
                 </div>
@@ -1110,7 +1125,7 @@ export function App() {
       </section>
 
       <footer className={`statusbar ${result.ok ? "statusbar--ok" : "statusbar--error"}`}>
-        {result.ok ? `Parsed successfully · ${result.analysis.entities.length} entities · ${result.paths.length} execution paths · ${result.analysis.stats.decisionPoints} decision points` : result.error}
+        {result.ok ? `${t("Parsed successfully")} · ${result.analysis.entities.length} ${t("entities")} · ${result.paths.length} ${t("execution paths")} · ${result.analysis.stats.decisionPoints} ${t("decision points")}` : result.error}
       </footer>
     </main>
   );

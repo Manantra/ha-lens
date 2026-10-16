@@ -1,0 +1,14 @@
+{
+  "title": "HA Lens",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Dodaj HA Lens",
+        "description": "Dodaje do paska bocznego Home Assistant narzędzie HA Lens do analizy automatyzacji, działające tylko w trybie odczytu."
+      }
+    },
+    "abort": {
+      "single_instance_allowed": "Można skonfigurować tylko jedną instancję HA Lens."
+    }
+  }
+}
