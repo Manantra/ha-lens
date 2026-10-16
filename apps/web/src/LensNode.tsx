@@ -46,12 +46,12 @@ export function LensNode({ data, selected }: NodeProps) {
       <Handle type="target" position={Position.Top} />
       <div className="lens-node__topline">
         <div className="lens-node__kind-row">
-          <div className="lens-node__kind">{t(node.kind)}</div>
+          <div className="lens-node__kind" title={t(node.kind)}>{t(node.kind)}</div>
           <NodeEntityIcons icons={entityIcons} />
         </div>
         <div className="lens-node__badges">
-          {node.disabled && <div className="lens-node__disabled-badge">{t("disabled")}</div>}
-          {!node.disabled && node.dynamicEnabled && <div className="lens-node__dynamic-enabled-badge">{t("runtime enabled")}</div>}
+          {node.disabled && <div className="lens-node__disabled-badge" title={t("disabled")}>{t("disabled")}</div>}
+          {!node.disabled && node.dynamicEnabled && <div className="lens-node__dynamic-enabled-badge" title={t("runtime enabled")}>{t("runtime enabled")}</div>}
           {node.diffStatus && (
             <div className={`lens-node__diff-badge lens-node__diff-badge--${node.diffStatus}`}>
               {node.diffStatus === "added" ? "+ " + t("Added") : node.diffStatus === "removed" ? "− " + t("Removed") : "~ " + t("Changed")}

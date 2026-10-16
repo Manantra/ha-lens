@@ -1129,3 +1129,13 @@ button.ghost { background: transparent; color: #dce3f5; }
   font-weight: 800;
   letter-spacing: .02em;
 }
+
+/* Keep longer localized labels readable without changing ELK's fixed node geometry. */
+.lens-node__kind-row { flex: 1 1 auto; overflow: hidden; }
+.lens-node__kind { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lens-node__badges { min-width: 0; flex: 0 1 auto; max-width: 70%; overflow: hidden; }
+.lens-node__diff-badge,
+.lens-node__disabled-badge,
+.lens-node__dynamic-enabled-badge { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.diff-header { flex-wrap: wrap; }
+.diff-baseline-button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
