@@ -38,12 +38,8 @@ export function localizeKind(kind: string, language: Language): string {
   return translate(kind, language);
 }
 
-/** Localize only known HA Lens-generated prose patterns; never rewrite user-supplied YAML, aliases or IDs. */
-export function localizeNarrative(text: string, language: Language): string {
-  const exact = translate(text, language);
-  if (exact !== text || language === "en") return exact;
-
-  const patterns: Array<[RegExp, string, string[]]> = [
+/** Known patterns are immutable and shared across renders. */
+const NARRATIVE_PATTERNS: Array<[RegExp, string, string[]]> = [
     [/^Starts when (.+)\.$/, "Starts when {detail}.", ["detail"]],
     [/^(\d+) configured triggers? (?:is|are) disabled in Home Assistant\.$/, "{count} configured triggers are disabled in Home Assistant.", ["count"]],
     [/^(\d+) configured triggers? (?:uses|use) templated enabled state and can start the automation only when Home Assistant evaluates the template as true\.$/, "{count} configured triggers use templated enabled state and can start the automation only when Home Assistant evaluates the template as true.", ["count"]],
@@ -78,8 +74,14 @@ export function localizeNarrative(text: string, language: Language): string {
     [/^Path (\d+)$/, "Path {index}", ["index"]],
     [/^Stops at (.+)$/, "Stops at {item}", ["item"]],
     [/^Completes: (.+)$/, "Completes: {item}", ["item"]],
-  ];
-  for (const [pattern, key, fields] of patterns) {
+];
+
+/** Localize only known HA Lens-generated prose patterns; never rewrite user-supplied YAML, aliases or IDs. */
+export function localizeNarrative(text: string, language: Language): string {
+  const exact = translate(text, language);
+  if (exact !== text || language === "en") return exact;
+
+  for (const [pattern, key, fields] of NARRATIVE_PATTERNS) {
     const match = text.match(pattern);
     if (!match) continue;
     const vars: Record<string, string> = {};
