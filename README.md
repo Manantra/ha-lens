@@ -6,7 +6,7 @@
 
 HA Lens is a read-only visualizer and analyzer for Home Assistant automations. It turns automation YAML into a semantic flow graph, execution paths, entity/action inventory, structural insights, deterministic explanations, and—inside Home Assistant—a view of the latest runtime trace.
 
-> Current stable companion release: **v0.1.36**. Latest preview: **v0.1.38-beta.3**, with seven-language localization, generated-graph-label translation, locale-aware quantity grammar, corrected document language, and narrow-screen YAML toolbar wrapping. The standalone viewer passed seven-language Chrome tests, including unchanged local YAML and Diff baseline; full authenticated Home Assistant language switching and Trace testing are still required before Stable. HA Lens remains read-only: it analyzes automations but does not execute or modify them.
+> Current stable companion release: **v0.1.36**. Latest preview: **v0.1.38-beta.4**, with seven-language localization, generated-graph-label translation, locale-aware quantity grammar, corrected document language, narrow-screen YAML toolbar wrapping, and pinned Home Assistant compatibility runners. The standalone viewer passed seven-language Chrome tests, including unchanged local YAML and Diff baseline; full authenticated Home Assistant language switching and Trace testing are still required before Stable. HA Lens remains read-only: it analyzes automations but does not execute or modify them.
 
 ## Why HA Lens?
 
@@ -96,7 +96,7 @@ The Home Assistant companion does **not** require GitHub Pages: HACS installs a 
 
 The Home Assistant 2026 compatibility and security-hardening work is available in Stable **v0.1.36**. The next focus is:
 
-- live-test **v0.1.38-beta.3** in Home Assistant across the seven supported languages, including language switching and unchanged YAML
+- live-test **v0.1.38-beta.4** in Home Assistant across the seven supported languages, including language switching and unchanged YAML
 - confirm responsive graph/Trace/Diff/Lint presentation, generated labels and language-specific plural forms
 - release v0.1.38 Stable only after the real-browser test passes; continue improving snapshot/lint UX only from user feedback
 
