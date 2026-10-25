@@ -281,6 +281,24 @@ button.ghost { background: transparent; color: #dce3f5; }
 }
 
 @media (max-width: 480px) {
+  .yaml-panel {
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .yaml-panel .panel__header {
+    height: auto;
+    min-height: 46px;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-block: 8px;
+  }
+
+  .yaml-panel__tools {
+    min-width: 0;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
   .brand {
     font-size: 18px;
   }
