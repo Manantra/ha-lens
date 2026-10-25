@@ -132,6 +132,9 @@ export function App() {
   const [tab, setTab] = useState<Tab>("summary");
   const [language, setLanguage] = useState<Language>(() =>
     normalizeLanguage(new URLSearchParams(window.location.search).get("lang") || navigator.language));
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
   const t = (key: string) => translate(key, language);
   const [selectedPath, setSelectedPath] = useState<ExecutionPath | null>(null);
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
