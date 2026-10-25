@@ -102,7 +102,7 @@ v0.1.36 carries the Home Assistant 2026 compatibility and security-hardening wor
 - [x] translate viewer controls, navigation, Diff/Trace/Lint status labels, path and advisory explanation text
 - [x] preserve Home Assistant and HA Lens branding, YAML keys, IDs, trace paths, and user-authored content verbatim
 - [x] standalone viewer language selection, complete translation catalogue tests, CSS/status invariants, automated build
-- [x] browser-test all seven languages in the Home Assistant-hosted standalone viewer without changing local YAML or Diff baseline\n- [x] fix HTML document language and 390px mobile YAML-toolbar overflow (v0.1.38-beta.3)\n- [ ] live-check all seven languages, narrow viewport rendering, and language switching in an actual Home Assistant browser session
+- [x] browser-test all seven languages in the Home Assistant-hosted standalone viewer without changing local YAML or Diff baseline\n- [x] fix HTML document language and 390px mobile YAML-toolbar overflow (v0.1.38-beta.4)\n- [ ] live-check all seven languages, narrow viewport rendering, and language switching in an actual Home Assistant browser session
 
 ## Next after v0.1.38 validation
 
