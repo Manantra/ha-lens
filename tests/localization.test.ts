@@ -134,6 +134,22 @@ describe("HA Lens localization", () => {
     expect(app).toContain('language={language}');
   });
 
+  it("keeps the HTML document locale in sync with the selected viewer language", () => {
+    const app = readFileSync("apps/web/src/App.tsx", "utf8");
+    expect(app).toMatch(/document\.documentElement\.lang = language;/);
+    expect(app).toMatch(/\}, \[language\]\);/);
+  });
+
+  it("allows the YAML toolbar to wrap instead of widening narrow mobile viewports", () => {
+    const css = readFileSync("apps/web/src/styles.css", "utf8");
+    const mobile = css.slice(css.indexOf("@media (max-width: 480px)"));
+    expect(mobile).toContain(".yaml-panel {");
+    expect(mobile).toContain("grid-template-rows: auto minmax(0, 1fr)");
+    expect(mobile).toContain(".yaml-panel .panel__header {");
+    expect(mobile).toContain("flex-wrap: wrap");
+    expect(mobile).toContain(".yaml-panel__tools {");
+  });
+
   it("has localized configuration flow entries for every supported language", () => {
     for (const language of LANGUAGE_CODES) {
       const file = readFileSync(`custom_components/ha_lens/translations/${language}.json`, "utf8");
