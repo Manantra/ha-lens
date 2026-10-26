@@ -2,9 +2,23 @@
 
 ![HA Lens logo](https://raw.githubusercontent.com/Manantra/ha-lens/main/assets/ha-lens-logo.png)
 
+[![CI](https://github.com/Manantra/ha-lens/actions/workflows/ci.yml/badge.svg)](https://github.com/Manantra/ha-lens/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **Understand every path through your Home Assistant automation.**
 
-HA Lens is a read-only visualizer and analyzer for Home Assistant automations. It turns automation YAML into a semantic flow graph, execution paths, entity/action inventory, structural insights, deterministic explanations, and—inside Home Assistant—a view of the latest runtime trace.
+HA Lens is a **read-only automation explorer** for Home Assistant. It turns YAML into visual flow graphs and bounded execution paths, helps you find referenced entities and actions, and—in its Home Assistant companion—shows the latest execution trace. It **does not change, run, or deploy automations**.
+
+## Get started
+
+| I want to… | Start here |
+| :-- | :-- |
+| **Use HA Lens inside Home Assistant** | [Install the HACS custom integration](docs/hacs-companion.md#hacs-custom-repository-install). The companion runs a bundled local viewer; GitHub Pages is not required. |
+| **Explore YAML in a standalone viewer** | Follow the [local quick start](#quick-start) with Node.js and npm. Your YAML is analyzed in the browser, not sent to a HA Lens backend. |
+| **Check supported features** | See the [automation support matrix](docs/support-matrix.md), including deliberate limitations. |
+| **Understand the implementation or contribute** | Browse the [architecture](docs/architecture.md), [roadmap](ROADMAP.md), or [contribution guide](CONTRIBUTING.md). |
+
+> **Visual examples:** HA Lens can export an automation graph as SVG or PNG, and its Presentation Mode is intended for readable demonstrations. Avoid publishing real automation traces, tokens, or private entity names in screenshots.
 
 > Current stable companion release: **v0.1.36**. Latest preview: **v0.1.38-beta.4**, with seven-language localization, generated-graph-label translation, locale-aware quantity grammar, corrected document language, narrow-screen YAML toolbar wrapping, and pinned Home Assistant compatibility runners. The standalone viewer passed seven-language Chrome tests, including unchanged local YAML and Diff baseline; full authenticated Home Assistant language switching and Trace testing are still required before Stable. HA Lens remains read-only: it analyzes automations but does not execute or modify them.
 
